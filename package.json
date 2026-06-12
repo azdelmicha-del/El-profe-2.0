@@ -11,14 +11,19 @@
   "license": "ISC",
   "description": "El Profe 2.0 - Planificación docente MINERD con IA",
   "dependencies": {
+    "archiver": "^8.0.0",
     "bcrypt": "^6.0.0",
+    "body-parser": "^2.2.2",
     "cors": "^2.8.6",
+    "docx": "^9.7.1",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "express": "^4.22.1",
     "express-rate-limit": "^8.3.2",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.24.0",
     "multer": "^2.1.1",
+    "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.1"
   },
   "devDependencies": {

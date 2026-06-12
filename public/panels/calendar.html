@@ -1,0 +1,13 @@
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+  <button id="calPrev" style="background:none;border:none;font-size:22px;color:var(--primary);cursor:pointer;">&#9664;</button>
+  <h2 id="calTitle" style="font-size:18px;font-weight:700;"></h2>
+  <button id="calNext" style="background:none;border:none;font-size:22px;color:var(--primary);cursor:pointer;">&#9654;</button>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+  <button class="qa-btn" data-type="daily" style="background:#fef3c7;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:#92400e;cursor:pointer;">&#128197; Plan Diario</button>
+  <button class="qa-btn" data-type="weekly" style="background:#d1fae5;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:#065f46;cursor:pointer;">&#128200; Plan Semanal</button>
+</div>
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:11px;font-weight:700;color:var(--text-light);margin-bottom:8px;">
+  <span>Dom</span><span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span>
+</div>
+<div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;"></div>
