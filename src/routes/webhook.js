@@ -1,8 +1,12 @@
 const { getDb } = require('../db');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const fs = require('fs');
+const path = require('path');
+const PDFDocument = require('pdfkit');
 
-const WA_VERIFY_TOKEN = 'elprofe2_verify_2026';
+const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || 'elprofe2_verify_2026';
+const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 module.exports = function (app) {
     app.get('/webhook/whatsapp', (req, res) => {
@@ -41,31 +45,25 @@ module.exports = function (app) {
                 userId = result.insertedId.toString();
                 user = await getDb().collection('users').findOne({ _id: new mongoose.Types.ObjectId(userId) });
                 const welcomeReply = '¡Hola, profe! \n\nA partir de hoy voy a ser tu asistente de planificaciones.\n\nPuedo ayudarte a crear unidades, secuencias, planificaciones diarias, rúbricas, listas de cotejo, evaluaciones y actividades.\n\nAntes de empezar, cuéntame:\n📌 ¿Cuál es tu nombre?\n📌 ¿Qué grado y área trabajas normalmente?\n\nAsí puedo guardar tus planificaciones organizadas y adaptadas a ti.';
-                const WA_TOKEN = process.env.WA_TOKEN;
-                const WA_PHONE_ID = process.env.WA_PHONE_ID;
-                if (WA_TOKEN && WA_PHONE_ID) {
-                    await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${WA_TOKEN}` },
-                        body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'text', text: { body: welcomeReply } })
-                    });
-                }
+                await sendWhatsAppMessage(from, welcomeReply);
                 return;
             }
             userId = user._id.toString();
             if (!user.name) {
                 const askReply = '¡Hola de nuevo, profe! \n\nAntes de empezar, dime tu nombre y el grado que normalmente trabajas para guardar tus planificaciones organizadas.';
-                const WA_TOKEN = process.env.WA_TOKEN;
-                const WA_PHONE_ID = process.env.WA_PHONE_ID;
-                if (WA_TOKEN && WA_PHONE_ID) {
-                    await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${WA_TOKEN}` },
-                        body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'text', text: { body: askReply } })
-                    });
-                }
+                await sendWhatsAppMessage(from, askReply);
                 return;
             }
+
+            // --- 1. MEMORIA DE WHATSAPP (AMNESIA FIX) ---
+            const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+            let activeConv = await getDb().collection('conversations').findOne({
+                userId,
+                is_whatsapp: true,
+                createdAt: { $gte: twelveHoursAgo }
+            }, { sort: { createdAt: -1 } });
+
+            const historyMessages = activeConv ? activeConv.messages.map(m => ({ role: m.role, content: m.content })) : [];
 
             const refDocs = await getDb().collection('references').find({ userId }).toArray();
             let refBlock = '';
@@ -82,52 +80,35 @@ PERSONALIDAD:
 - Siempre respondes en español dominicano.
 
 FUNCIÓN PRINCIPAL:
-Ayudas a maestros dominicanos a crear PLANIFICACIONES DOCENTES completas. Puedes generar:
+Ayudas a maestros dominicanos a crear PLANIFICACIONES DOCENTES completas.
 
-1. UNIDADES DIDÁCTICAS: nombre, situación de aprendizaje, competencias, indicadores, contenidos, estrategias, recursos, evaluación, evidencias, secuencia de clases, adecuaciones, producto final.
-2. PLANIFICACIONES DIARIAS: tema, propósito, inicio, desarrollo, cierre, actividades, recursos, evaluación, tarea, evidencia, observaciones.
-3. PLANIFICACIONES SEMANALES: lunes a viernes con actividades, evaluación y tareas.
-4. RÚBRICAS, LISTAS DE COTEJO, ESCALAS ESTIMATIVAS.
-5. PRUEBAS, ACTIVIDADES DIAGNÓSTICAS, GUÍAS DE TRABAJO.
+REGLAS DE GENERACIÓN DE PDF:
+Si el usuario te pide explícitamente "Envíame un PDF", "Hazme un PDF", "Quiero eso en PDF", o "Descargar" sobre la planificación actual, DEBES responder EXACTAMENTE incluyendo esta palabra mágica en tu respuesta: [GENERATE_PDF] y luego añades un mensaje amable indicando que el PDF se está enviando.
+Si no pide un PDF explícitamente, responde normalmente.
 
 CONOCIMIENTO CURRICULAR (MINERD):
-- Niveles: Inicial, Primario (1ero a 6to), Secundario (1ero a 6to)
-- Áreas: Lengua Española, Matemática, Ciencias Sociales, Ciencias de la Naturaleza, Inglés, Educación Física, Formación Humana, Educación Artística
-- Competencias fundamentales y específicas por grado
-- Indicadores de logro, contenidos conceptuales/procedimentales/actitudinales
+- Niveles: Inicial, Primario, Secundario
 - Enfoque por competencias y ejes transversales
 - Estructura formal dominicana: inicio-desarrollo-cierre
 
 FLUJO DE CONVERSACIÓN:
-- Si el usuario pide algo, identifica qué tipo de documento necesita (unidad, diaria, semanal, rúbrica, etc.)
-- Recolecta datos de forma natural, preguntando de a una cosa a la vez
-- Si falta grado, área o tema, pregunta amablemente
-- Usa la información del perfil del docente si está disponible
-
-ENTREGA:
-- Entrega la planificación con estructura formal y clara
-- Usa texto plano con saltos de línea (sin markdown)
-- Al final pregunta: "¿Quieres que le haga algún cambio, profe?"
-- Ofrece: "También puedo hacerte una rúbrica, lista de cotejo o actividad de evaluación para esta misma clase."
-
-EDICIÓN:
-- Si el usuario pide cambios (más corta, más actividades, cambiar grado, etc.), ajusta la planificación
-- Siempre pregunta si quedó bien o quiere más ajustes
-
-REGLAS:
-- No inventes referencias bibliográficas
-- Si no entiendes exactamente qué quiere, pregunta amablemente
-- Mantén un tono cálido pero profesional`;
+- Identifica qué tipo de documento necesita.
+- Recolecta datos de forma natural si faltan (grado, área, tema).
+- Entrega la planificación con estructura formal y clara, sin markdown excesivo.`;
 
             const systemWithRefs = MINERD_SYSTEM_PROMPT + refBlock;
-            const messages = [{ role: 'system', content: systemWithRefs }, { role: 'user', content: text }];
+            const messages = [
+                { role: 'system', content: systemWithRefs },
+                ...historyMessages,
+                { role: 'user', content: text }
+            ];
 
             let reply = '⚠️ No pude procesar tu solicitud. Intenta de nuevo.';
             try {
                 const r = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 2000, temperature: 0.3, messages })
+                    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 3000, temperature: 0.3, messages })
                 });
                 if (r.ok) {
                     const d = await r.json();
@@ -137,30 +118,158 @@ REGLAS:
             } catch (e) {}
 
             const now = new Date();
-            await getDb().collection('conversations').insertOne({
-                userId, title: 'WhatsApp: ' + text.slice(0, 50), messages: [
-                    { role: 'user', content: text, timestamp: now },
-                    { role: 'assistant', content: reply, timestamp: new Date() }
-                ], createdAt: now, pdfGenerated: false
-            });
+            const newMessages = [
+                { role: 'user', content: text, timestamp: now },
+                { role: 'assistant', content: reply, timestamp: new Date() }
+            ];
+
+            if (activeConv) {
+                await getDb().collection('conversations').updateOne(
+                    { _id: activeConv._id },
+                    { $push: { messages: { $each: newMessages } } }
+                );
+            } else {
+                const insertResult = await getDb().collection('conversations').insertOne({
+                    userId,
+                    is_whatsapp: true,
+                    title: 'WhatsApp: ' + now.toLocaleDateString('es-DO'),
+                    messages: newMessages,
+                    createdAt: now,
+                    pdfGenerated: false
+                });
+                activeConv = await getDb().collection('conversations').findOne({ _id: insertResult.insertedId });
+            }
 
             await getDb().collection('client_messages').insertOne({ phone: from, message: reply, direction: 'outgoing', employeeId: null, employeeName: 'Bot WhatsApp', createdAt: new Date() });
-            const WA_TOKEN = process.env.WA_TOKEN;
-            const WA_PHONE_ID = process.env.WA_PHONE_ID;
-            if (WA_TOKEN && WA_PHONE_ID) {
-                await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${WA_TOKEN}` },
-                    body: JSON.stringify({
-                        messaging_product: 'whatsapp', to: from, type: 'text',
-                        text: { body: reply.slice(0, 4096) }
-                    })
-                });
+
+            // --- 2. ENTREGA DE PDFS POR WHATSAPP ---
+            if (reply.includes('[GENERATE_PDF]')) {
+                const cleanReply = reply.replace(/\[GENERATE_PDF\]/g, '').trim();
+                
+                // Generar PDF
+                const pdfFilename = `planificacion-${from}-${Date.now()}.pdf`;
+                const pdfPath = path.join(PROJECT_ROOT, 'public', 'downloads', pdfFilename);
+                const pdfUrl = `https://planixa.onrender.com/downloads/${pdfFilename}`;
+                
+                await createPdfFromConv(activeConv, user, pdfPath);
+                
+                // Enviar Mensaje de texto indicando que ahí va el PDF
+                await sendWhatsAppMessage(from, cleanReply || "Aquí tienes tu planificación en PDF, profe:");
+                
+                // Enviar el PDF como documento
+                await sendWhatsAppDocument(from, pdfUrl, pdfFilename);
             } else {
-                console.log('Respuesta (simulada):', reply.slice(0, 100) + '...');
+                // Mensaje normal, particionado si es muy largo
+                const chunks = reply.match(/.{1,4000}/g) || [];
+                for (const chunk of chunks) {
+                    await sendWhatsAppMessage(from, chunk);
+                }
             }
+
         } catch (err) {
             console.error('WhatsApp webhook error:', err.message);
         }
     });
 };
+
+async function sendWhatsAppMessage(to, text) {
+    const WA_TOKEN = process.env.WA_TOKEN;
+    const WA_PHONE_ID = process.env.WA_PHONE_ID;
+    if (WA_TOKEN && WA_PHONE_ID) {
+        await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${WA_TOKEN}` },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to: to, type: 'text', text: { body: text } })
+        });
+    } else {
+        console.log('Respuesta simulada:', text.slice(0, 100) + '...');
+    }
+}
+
+async function sendWhatsAppDocument(to, link, filename) {
+    const WA_TOKEN = process.env.WA_TOKEN;
+    const WA_PHONE_ID = process.env.WA_PHONE_ID;
+    if (WA_TOKEN && WA_PHONE_ID) {
+        await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${WA_TOKEN}` },
+            body: JSON.stringify({ 
+                messaging_product: 'whatsapp', 
+                to: to, 
+                type: 'document', 
+                document: { link: link, filename: filename } 
+            })
+        });
+    }
+}
+
+function createPdfFromConv(conv, user, outputPath) {
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ margin: 50, size: 'LETTER' });
+        const stream = fs.createWriteStream(outputPath);
+        doc.pipe(stream);
+
+        const leftMargin = 50;
+        const pageWidth = 612;
+        const centerX = pageWidth / 2;
+
+        try {
+            if (fs.existsSync(path.join(PROJECT_ROOT, 'assets', 'minerd-logo.png'))) {
+                doc.image(path.join(PROJECT_ROOT, 'assets', 'minerd-logo.png'), centerX - 30, 20, { width: 60 });
+            }
+        } catch (e) {}
+
+        doc.fontSize(16).font('Helvetica-Bold').text('Ministerio de Educación de República Dominicana', centerX, 90, { align: 'center' });
+        doc.fontSize(12).font('Helvetica').text('Planificación Docente', centerX, 115, { align: 'center' });
+        doc.moveDown();
+
+        const dateStr = new Date().toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' });
+        doc.fontSize(9).fillColor('#666').text(`Generado el ${dateStr}`, { align: 'right' });
+        doc.fillColor('#000');
+
+        doc.moveDown();
+        doc.moveTo(leftMargin, doc.y).lineTo(pageWidth - leftMargin, doc.y).stroke('#ccc');
+        doc.moveDown();
+
+        const titleText = conv.title || 'Planificación Docente';
+        doc.fontSize(14).font('Helvetica-Bold').text(titleText, leftMargin, doc.y, { underline: true });
+        doc.moveDown();
+
+        if (user && user.name) {
+            doc.fontSize(10).font('Helvetica').text(`Docente: ${user.name}     Celular: ${user.phone}`);
+            doc.moveDown(0.5);
+        }
+
+        doc.moveTo(leftMargin, doc.y).lineTo(pageWidth - leftMargin, doc.y).stroke('#ccc');
+        doc.moveDown();
+
+        const messages = conv.messages || [];
+        for (const msg of messages) {
+            if (msg.role === 'assistant' && msg.content.length > 100) {
+                if (doc.y > 700) doc.addPage();
+                
+                let content = String(msg.content || '').replace(/\[GENERATE_PDF\]/g, '');
+                
+                doc.fontSize(10).font('Helvetica').fillColor('#333');
+                const lines = content.split('\n');
+                for (const line of lines) {
+                    if (doc.y > 720) doc.addPage();
+                    if (line.trim().startsWith('-') || line.trim().startsWith('*')) {
+                        doc.text(`• ${line.replace(/^[-*]/, '').trim()}`, leftMargin + 10, doc.y);
+                    } else if (line.trim().startsWith('#')) {
+                        doc.moveDown(0.5);
+                        doc.font('Helvetica-Bold').fillColor('#111').text(line.replace(/^#+/, '').trim(), leftMargin, doc.y);
+                        doc.font('Helvetica').fillColor('#333');
+                    } else {
+                        doc.text(line, leftMargin, doc.y);
+                    }
+                }
+                doc.moveDown();
+            }
+        }
+
+        doc.end();
+        stream.on('finish', resolve);
+        stream.on('error', reject);
+    });
+}
