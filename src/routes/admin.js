@@ -19,6 +19,28 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 module.exports = function (app) {
+    // --- SUPERVISOR IA ---
+    app.get('/api/admin/supervisor_logs', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const logs = await getDb().collection('supervisor_logs').find({}).sort({ date: -1 }).limit(100).toArray();
+            
+            // Get settings status
+            const settings = await getDb().collection('settings').findOne({ _id: 'general' });
+            const enabled = settings?.supervisor_enabled === true;
+            
+            res.json({ logs, enabled });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.post('/api/admin/settings/supervisor', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const enabled = req.body.enabled === true;
+            await getDb().collection('settings').updateOne({ _id: 'general' }, { $set: { supervisor_enabled: enabled } }, { upsert: true });
+            res.json({ success: true, enabled });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
     app.get('/api/admin/users', authenticateToken, async (req, res) => {
         if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
         try {

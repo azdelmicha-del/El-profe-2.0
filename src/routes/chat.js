@@ -5,6 +5,7 @@ const path = require('path');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
 const mongoose = require('mongoose');
+const { callSupervisor } = require('../utils/supervisor');
 
 module.exports = function (app) {
     app.post('/chat', authenticateToken, async (req, res) => {
@@ -158,15 +159,26 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
         const googleKey = process.env.GOOGLE_AI_KEY;
 
         async function tryOpenAI() {
+            let reply = null;
             if (!openaiKey || openaiKey.includes('your_')) return null;
-            const r = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-                body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 2000, temperature: 0.3, messages })
-            });
-            if (!r.ok) return null;
-            const d = await r.json();
-            return d?.choices?.[0]?.message?.content?.trim() || null;
+            try {
+                const r = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+                    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 2000, temperature: 0.3, messages })
+                });
+                if (r.ok) {
+                    const d = await r.json();
+                    const t = d?.choices?.[0]?.message?.content?.trim();
+                    if (t) reply = t;
+                }
+            } catch (e) {
+                console.error("OpenAI Error:", e);
+            }
+            
+            // -- PASO SUPERVISOR IA --
+            if (reply) reply = await callSupervisor(userId, systemWithRefs, message, reply);
+            return reply;
         }
 
         async function tryGemini() {

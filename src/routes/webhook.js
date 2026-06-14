@@ -6,6 +6,7 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
+const { callSupervisor } = require('../utils/supervisor');
 
 const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || 'elprofe2_verify_2026';
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
@@ -260,6 +261,9 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                     if (t) reply = t;
                 }
             } catch (e) {}
+
+            // -- PASO SUPERVISOR IA --
+            reply = await callSupervisor(user._id.toString(), systemWithRefs, text, reply);
 
             if ((reply.includes('[GENERATE_PDF]') || reply.includes('[GENERATE_WORD]')) && user.plan !== 'lifetime' && !user.is_admin) {
                 await getDb().collection('users').updateOne({ _id: user._id }, { $inc: { plans_count: 1 } });

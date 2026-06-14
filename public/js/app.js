@@ -106,8 +106,9 @@ async function enterApp() {
     if ($('adminNavTab')) {
       $('adminNavTab').style.display = 'inline-block';
       if ($('clientsNavTab')) $('clientsNavTab').style.display = 'inline-block';
+      if ($('supervisorNavTab')) $('supervisorNavTab').style.display = 'inline-block';
       document.querySelectorAll('.nav-tab').forEach(t => {
-        const allowed = ['admin', 'clients'];
+        const allowed = ['admin', 'clients', 'supervisor'];
         if (!allowed.includes(t.dataset.tab)) t.style.display = 'none';
       });
       if ($('topNewBtn')) $('topNewBtn').style.display = 'none';

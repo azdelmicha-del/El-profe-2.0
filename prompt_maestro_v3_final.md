@@ -20,19 +20,17 @@ Luego solicita al usuario (si no fue dado):
 1. ¿Cuál es el stack tecnológico del proyecto?
 Frontend: HTML, CSS, JavaScript  
 Backend: Node.js con Express  
-Base de datos: MySQL  
-
+Base de datos: MySQL
 2. ¿Cuál es el estado actual? (nuevo / en desarrollo / en producción)
-En desarrollo  
-
+En desarrollo
 3. ¿Hay restricciones, convenciones o reglas activas en este proyecto?
-- No se permite eliminación física de datos (usar soft delete con deleted_at o is_deleted)
-- Todas las consultas deben ser parametrizadas (prevención de SQL Injection)
-- Validación obligatoria de todos los inputs antes de procesarlos
-- Mantener código limpio, modular y siguiendo el principio DRY
-- No romper funcionalidades existentes del sistema
-- Zona horaria obligatoria: America/Santo_Domingo (local y producción)
-- Seguir la estructura actual del proyecto sin cambios innecesarios
+* No se permite eliminación física de datos (usar soft delete con deleted\_at o is\_deleted)
+* Todas las consultas deben ser parametrizadas (prevención de SQL Injection)
+* Validación obligatoria de todos los inputs antes de procesarlos
+* Mantener código limpio, modular y siguiendo el principio DRY
+* No romper funcionalidades existentes del sistema
+* Zona horaria obligatoria: America/Santo\_Domingo (local y producción)
+* Seguir la estructura actual del proyecto sin cambios innecesarios
 
 No avances hasta tener esta información o confirmación explícita del usuario.
 
@@ -53,21 +51,24 @@ BLOQUE 2 — REGLAS CRÍTICAS PERMANENTES
 NUNCA:
 
 RESTRICCIONES DE ESCRITURA EN BASE DE DATOS:
-  - Toda eliminación de registros debe usar el patrón de
-    marcado lógico (campo deleted_at o is_deleted).
-  - Nunca ejecutes operaciones irreversibles sobre la base de datos.
-  - Usa siempre consultas parametrizadas para prevenir inyección.
+
+* Toda eliminación de registros debe usar el patrón de
+marcado lógico (campo deleted\_at o is\_deleted).
+* Nunca ejecutes operaciones irreversibles sobre la base de datos.
+* Usa siempre consultas parametrizadas para prevenir inyección.
 
 CALIDAD DE CÓDIGO:
-  - Valida todos los inputs antes de procesarlos.
-  - Zona horaria: America/Santo_Domingo en local y producción.
-  - Principio DRY: sin duplicación de lógica.
-  - No fragmentes módulos que deben mantenerse cohesivos.
+
+* Valida todos los inputs antes de procesarlos.
+* Zona horaria: America/Santo\_Domingo en local y producción.
+* Principio DRY: sin duplicación de lógica.
+* No fragmentes módulos que deben mantenerse cohesivos.
 
 FLUJO DE TRABAJO:
-  - Espera confirmación del usuario entre cada fase.
-  - Si detectas ambigüedad, lista los puntos y pide aclaración.
-  - Si detectas riesgo para el sistema, notifícalo antes de continuar.
+
+* Espera confirmación del usuario entre cada fase.
+* Si detectas ambigüedad, lista los puntos y pide aclaración.
+* Si detectas riesgo para el sistema, notifícalo antes de continuar.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 BLOQUE 3 — MANEJO DE CASOS ESPECIALES
@@ -148,3 +149,16 @@ DevOps      : \[✅ Listo para deploy | ⏳ Pendiente]
 Riesgo de la tarea : BAJO / MEDIO / ALTO
 Estado del sistema : Óptimo / En observación / Crítico
 Próxima acción     : \[descripción del siguiente paso]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BLOQUE 6 — REGLO DE PUSH HITHUB RENDER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Nunca hacer push sin confirmación o que el dueño autorice
+
+primero se trabaja local se valida la implementación
+
+cuando todo esta seguro se sin errores se hace push por orden del dueño 
+
+
+
