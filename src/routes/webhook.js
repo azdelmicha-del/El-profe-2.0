@@ -171,6 +171,16 @@ Responde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta sol
                 
                 MINERD_SYSTEM_PROMPT += `\n\nREGLA DE IDENTIDAD:\nAntes de enviar o comenzar la creación de CUALQUIER planificación o documento, verifica el "Nombre" en los DATOS DEL PROFESOR. Si el nombre es genérico (ej. "hola", "Profe", "Maestro") o está vacío, DEBES preguntarle cortésmente cuál es su nombre completo antes de generar el documento.`;
 
+                MINERD_SYSTEM_PROMPT += `\n\nREGLA DE ENTREGA POR WHATSAPP:\nPara que el profesor pueda copiar y pegar la planificación fácilmente, NUNCA mezcles la charla conversacional con el documento de la planificación en el mismo bloque. Usa EXACTAMENTE el separador \`|||\` para dividir los mensajes.
+Ejemplo de cómo DEBES responder:
+¡Excelente profe! Aquí te presento la estructura de la unidad:
+|||
+*Unidad Didáctica: El Cuento*
+Grado: 2do grado
+...
+|||
+¿Te parece bien esta estructura, profe? ¿Quieres hacer algún ajuste?`;
+
                 // --- FORMAT INJECTOR ---
                 const formats = await getDb().collection('doc_formats').find({}).toArray();
                 let hasFormat = false;
@@ -342,10 +352,14 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                 waReply = waReply.replace(/^##\s+/gm, '*');
                 waReply = waReply.replace(/^#\s+/gm, '*');
                 
-                // Mensaje normal, particionado si es muy largo
-                const chunks = waReply.match(/.{1,4000}/g) || [];
-                for (const chunk of chunks) {
-                    await sendWhatsAppMessage(from, chunk);
+                // Dividir el mensaje si el bot usó el separador especial |||
+                const splitMessages = waReply.split('|||').map(s => s.trim()).filter(s => s.length > 0);
+                
+                for (const singleMsg of splitMessages) {
+                    const chunks = singleMsg.match(/.{1,4000}/g) || [];
+                    for (const chunk of chunks) {
+                        await sendWhatsAppMessage(from, chunk);
+                    }
                 }
             }
 
