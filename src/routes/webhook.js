@@ -4,6 +4,8 @@ const bcrypt = require('bcrypt');
 const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
+const PizZip = require('pizzip');
+const Docxtemplater = require('docxtemplater');
 
 const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || 'elprofe2_verify_2026';
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
@@ -72,7 +74,35 @@ module.exports = function (app) {
             }
 
             if (!user.name) {
-                await getDb().collection('users').updateOne({ _id: user._id }, { $set: { name: text } });
+                const parsePrompt = `Extrae el nombre del profesor, el grado, el área/materia y el centro educativo (si lo menciona) del siguiente texto. Responde ÚNICAMENTE con un JSON válido usando estas claves: "name", "grade", "area", "school". Si falta algo, déjalo vacío ("").\nTexto: "${text}"`;
+                try {
+                    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                        body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: parsePrompt }], max_tokens: 150, temperature: 0 })
+                    });
+                    if (r.ok) {
+                        const d = await r.json();
+                        const parsedStr = d.choices[0].message.content.trim();
+                        const jsonMatch = parsedStr.match(/\{[\s\S]*?\}/);
+                        if (jsonMatch) {
+                            const data = JSON.parse(jsonMatch[0]);
+                            await getDb().collection('users').updateOne({ _id: user._id }, { $set: { 
+                                name: data.name || text.slice(0, 50), 
+                                grade: data.grade || '', 
+                                area: data.area || '', 
+                                school: data.school || '' 
+                            } });
+                        } else {
+                            await getDb().collection('users').updateOne({ _id: user._id }, { $set: { name: text.slice(0, 50) } });
+                        }
+                    } else {
+                        await getDb().collection('users').updateOne({ _id: user._id }, { $set: { name: text.slice(0, 50) } });
+                    }
+                } catch(e) {
+                    await getDb().collection('users').updateOne({ _id: user._id }, { $set: { name: text.slice(0, 50) } });
+                }
+
                 const confirmReply = '¡Excelente profe! Ya he guardado tus datos. ¿En qué puedo ayudarte hoy con tu planificación?';
                 await sendWhatsAppMessage(from, confirmReply);
                 return;
@@ -94,8 +124,103 @@ module.exports = function (app) {
                 refBlock = '\n\nDOCUMENTOS DE REFERENCIA:\n' + refDocs.map(r => `📄 ${r.name}: ${(r.text||'').slice(0,2000)}`).join('\n---\n');
             }
 
-            let config = await getDb().collection('settings').findOne({ _id: 'global' });
-            const MINERD_SYSTEM_PROMPT = config?.system_prompt || `Eres "Planixa", asistente de planificación docente del MINERD. Responde en español dominicano.`;
+            let MINERD_SYSTEM_PROMPT = `Eres "Planixa", asistente de planificación docente del MINERD. Responde en español dominicano.`;
+            
+            try {
+                // Fetch prompts
+                const prompts = await getDb().collection('prompts').find({}).toArray();
+                let selectedPrompt = null;
+
+                if (prompts.length === 1) {
+                    selectedPrompt = prompts[0];
+                } else if (prompts.length > 1) {
+                    // --- AI ROUTER ---
+                    const routerPrompt = `Eres un enrutador inteligente. Tienes los siguientes Especialistas (Prompts) disponibles:
+${prompts.map(p => `- ID: ${p._id.toString()} | Nombre: ${p.name} | Cuándo usar: ${p.description}`).join('\n')}
+
+El usuario ha dicho: "${text}"
+
+Responde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta solicitud. Si ninguno aplica claramente, responde con el ID del Especialista más general o principal.`;
+                    
+                    const routerRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                        body: JSON.stringify({
+                            model: 'gpt-4o-mini',
+                            messages: [{ role: 'system', content: routerPrompt }],
+                            max_tokens: 50,
+                            temperature: 0
+                        })
+                    });
+                    
+                    if (routerRes.ok) {
+                        const rData = await routerRes.json();
+                        const chosenId = rData.choices?.[0]?.message?.content?.trim();
+                        selectedPrompt = prompts.find(p => p._id.toString() === chosenId) || prompts[0];
+                    } else {
+                        selectedPrompt = prompts[0];
+                    }
+                }
+
+                if (selectedPrompt) {
+                    MINERD_SYSTEM_PROMPT = selectedPrompt.content;
+                }
+                
+                // Inject User Profile Info
+                MINERD_SYSTEM_PROMPT += `\n\nDATOS DEL PROFESOR:\nNombre: ${user.name || 'Profe'}\nGrado: ${user.grade || 'No especificado'}\nÁrea/Materia: ${user.area || 'No especificada'}\nCentro Educativo: ${user.school || 'No especificado'}\nUsa estos datos siempre que necesites rellenar información personal del profesor o adaptar la planificación a su grado/materia, a menos que el profesor indique algo distinto para esta solicitud en particular.`;
+
+
+                // --- FORMAT INJECTOR ---
+                const formats = await getDb().collection('doc_formats').find({}).toArray();
+                if (formats.length > 0) {
+                    const formatMatcherPrompt = `Eres un clasificador. Revisa si el mensaje del usuario está pidiendo generar un documento. Formatos disponibles: ${formats.map(f => f.type).join(', ')}. Si pide uno de esos, responde EXACTAMENTE con el tipo. Si no, responde "NINGUNO".
+Mensaje: "${text}"`;
+                    
+                    const fRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                        body: JSON.stringify({
+                            model: 'gpt-4o-mini',
+                            messages: [{ role: 'system', content: formatMatcherPrompt }],
+                            max_tokens: 20,
+                            temperature: 0
+                        })
+                    });
+
+                    if (fRes.ok) {
+                        const fData = await fRes.json();
+                        const chosenType = fData.choices?.[0]?.message?.content?.trim();
+                        if (chosenType && chosenType !== "NINGUNO") {
+                            if (matchedFormat) {
+                                let tmplIns = `\n\nREGLA ESTRICTA DE FORMATO VISUAL (PLANTILLA WORD):\nEl administrador ha asignado una plantilla Word para este documento.`;
+                                if (matchedFormat.instructions) tmplIns += `\nINSTRUCCIONES EXTRA DEL ADMIN: ${matchedFormat.instructions}`;
+                                
+                                tmplIns += `\n\nREGLA DE APROBACIÓN (MUY IMPORTANTE):
+1. Llena los datos que correspondan y preséntalos EN TEXTO NORMAL para que el profesor los lea. 
+2. AL FINAL del mensaje, OBLIGATORIAMENTE pregúntale: "¿Quedó todo bien? ¿Deseas que te envíe este documento listo en Word?". 
+3. NO USES la etiqueta [GENERATE_WORD] en este momento.
+4. SÓLO usa [GENERATE_WORD] en tu SIGUIENTE mensaje si el profesor te responde que SÍ lo quiere en documento.
+
+CUANDO EL PROFESOR DE LA APROBACIÓN:
+Debes responder EXACTAMENTE con este formato:
+[GENERATE_WORD]
+\`\`\`json
+{
+  "etiqueta_del_word1": "Valor rellenado por ti",
+  "etiqueta_del_word2": "Valor rellenado por ti"
+}
+\`\`\`
+Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el contexto.`;
+                                MINERD_SYSTEM_PROMPT += tmplIns;
+                                // Inyectar el ID del formato en el system message temporalmente para saber cuál usar
+                                activeConv.pendingFormatId = matchedFormat._id.toString();
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Error en AI Router", err);
+            }
 
             const systemWithRefs = MINERD_SYSTEM_PROMPT + refBlock;
             const messages = [
@@ -118,7 +243,7 @@ module.exports = function (app) {
                 }
             } catch (e) {}
 
-            if (reply.length > 300 && user.plan !== 'lifetime' && !user.is_admin) {
+            if ((reply.includes('[GENERATE_PDF]') || reply.includes('[GENERATE_WORD]')) && user.plan !== 'lifetime' && !user.is_admin) {
                 await getDb().collection('users').updateOne({ _id: user._id }, { $inc: { plans_count: 1 } });
             }
 
@@ -149,23 +274,58 @@ module.exports = function (app) {
 
             await getDb().collection('client_messages').insertOne({ phone: from, message: reply, direction: 'outgoing', employeeId: null, employeeName: 'Bot WhatsApp', createdAt: new Date() });
 
-            // --- 2. ENTREGA DE PDFS POR WHATSAPP ---
-            if (reply.includes('[GENERATE_PDF]') || reply.length > 500) {
-                // Generar PDF
-                const pdfDir = path.join(PROJECT_ROOT, 'public', 'downloads');
-                if (!fs.existsSync(pdfDir)) {
-                    fs.mkdirSync(pdfDir, { recursive: true });
+            // --- 2. ENTREGA DE PDFS / WORDS POR WHATSAPP ---
+            if (reply.includes('[GENERATE_WORD]')) {
+                try {
+                    let jsonData = {};
+                    const jsonMatch = reply.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+                    if (jsonMatch) {
+                        jsonData = JSON.parse(jsonMatch[1]);
+                    }
+
+                    if (activeConv && activeConv.pendingFormatId) {
+                        const formatDoc = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(activeConv.pendingFormatId) });
+                        if (formatDoc && formatDoc.filePath) {
+                            const templatePath = path.join(PROJECT_ROOT, 'public', formatDoc.filePath);
+                            const outDir = path.join(PROJECT_ROOT, 'public', 'downloads');
+                            if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+                            
+                            const outFilename = `Documento-${from}-${Date.now()}.docx`;
+                            const outPath = path.join(outDir, outFilename);
+                            const outUrl = `https://planixa.onrender.com/downloads/${outFilename}`;
+                            
+                            const content = fs.readFileSync(templatePath, 'binary');
+                            const zip = new PizZip(content);
+                            const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+                            
+                            doc.render(jsonData);
+                            
+                            const buf = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+                            fs.writeFileSync(outPath, buf);
+
+                            await sendWhatsAppMessage(from, "Aquí tienes tu documento estructurado en Word, profe 📄✨");
+                            await sendWhatsAppDocument(from, outUrl, outFilename);
+                        } else {
+                            await sendWhatsAppMessage(from, "Hubo un error localizando la plantilla original.");
+                        }
+                    } else {
+                        await sendWhatsAppMessage(from, "Hubo un problema encontrando el formato.");
+                    }
+                } catch(e) {
+                    console.error("Error generating word: ", e);
+                    await sendWhatsAppMessage(from, "Ocurrió un error rellenando el documento Word.");
                 }
+            }
+            else if (reply.includes('[GENERATE_PDF]') || reply.length > 500) {
+                // Generar PDF legacy (Planificaciones regulares)
+                const pdfDir = path.join(PROJECT_ROOT, 'public', 'downloads');
+                if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
                 const pdfFilename = `planificacion-${from}-${Date.now()}.pdf`;
                 const pdfPath = path.join(pdfDir, pdfFilename);
                 const pdfUrl = `https://planixa.onrender.com/downloads/${pdfFilename}`;
                 
                 await createPdfFromConv(activeConv, user, pdfPath);
-                
-                // Enviar Mensaje de texto corto indicando que ahí va el PDF, y NO enviar todo el texto largo
                 await sendWhatsAppMessage(from, "Aquí tienes tu planificación en formato PDF, profe 📄✨");
-                
-                // Enviar el PDF como documento
                 await sendWhatsAppDocument(from, pdfUrl, pdfFilename);
             } else {
                 // Mensaje normal, particionado si es muy largo

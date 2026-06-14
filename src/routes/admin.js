@@ -1,6 +1,22 @@
 const mongoose = require('mongoose');
 const { authenticateToken, isAdmin } = require('../middleware/auth');
 const { getDb } = require('../db');
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
+
+// Configure multer storage
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const dest = path.join(__dirname, '../../public/uploads/formats');
+        if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+        cb(null, dest);
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+const upload = multer({ storage: storage });
 
 module.exports = function (app) {
     app.get('/api/admin/users', authenticateToken, async (req, res) => {
@@ -215,27 +231,116 @@ REGLAS DE GENERACIÓN DE PDF:
 Si el usuario te pide explícitamente "Envíame un PDF", "Hazme un PDF", "Quiero eso en PDF", o "Descargar" sobre la planificación actual, DEBES responder EXACTAMENTE incluyendo esta palabra mágica en tu respuesta: [GENERATE_PDF] y luego añades un mensaje amable indicando que el PDF se está enviando.
 Si no pide un PDF explícitamente, responde normalmente.`;
 
-    app.get('/api/admin/settings', authenticateToken, async (req, res) => {
+    // --- GESTOR DE PROMPTS (AGENTES) ---
+    app.get('/api/admin/prompts', authenticateToken, async (req, res) => {
         if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
         try {
-            let config = await getDb().collection('settings').findOne({ _id: 'global' });
-            if (!config) {
-                config = { _id: 'global', system_prompt: DEFAULT_PROMPT };
-                await getDb().collection('settings').insertOne(config);
+            let prompts = await getDb().collection('prompts').find({}).toArray();
+            if (prompts.length === 0) {
+                // Seed default
+                const defaultPrompt = { 
+                    name: "Planixa Principal", 
+                    description: "Usa este agente por defecto para cualquier solicitud general de planificación, tareas o asistencia estándar.", 
+                    content: DEFAULT_PROMPT,
+                    created_at: new Date()
+                };
+                const result = await getDb().collection('prompts').insertOne(defaultPrompt);
+                defaultPrompt._id = result.insertedId;
+                prompts = [defaultPrompt];
             }
-            res.json(config);
+            res.json(prompts.map(p => ({ id: p._id.toString(), name: p.name, description: p.description, content: p.content })));
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
-    app.put('/api/admin/settings', authenticateToken, async (req, res) => {
+    app.post('/api/admin/prompts', authenticateToken, async (req, res) => {
         if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
         try {
-            const { system_prompt } = req.body;
-            await getDb().collection('settings').updateOne(
-                { _id: 'global' },
-                { $set: { system_prompt: system_prompt || DEFAULT_PROMPT } },
-                { upsert: true }
-            );
+            const { name, description, content } = req.body;
+            if (!name || !content) return res.status(400).json({ error: 'Nombre y contenido son requeridos' });
+            
+            const newPrompt = { name, description, content, created_at: new Date() };
+            const result = await getDb().collection('prompts').insertOne(newPrompt);
+            res.json({ success: true, id: result.insertedId });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.put('/api/admin/prompts/:id', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const _id = new mongoose.Types.ObjectId(req.params.id);
+            const { name, description, content } = req.body;
+            await getDb().collection('prompts').updateOne({ _id }, { $set: { name, description, content, updated_at: new Date() } });
+            res.json({ success: true });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.delete('/api/admin/prompts/:id', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const _id = new mongoose.Types.ObjectId(req.params.id);
+            await getDb().collection('prompts').deleteOne({ _id });
+            res.json({ success: true });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    // --- GESTOR DE FORMATOS DOCUMENTALES (PDF/WORD) ---
+    app.get('/api/admin/formats', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const formats = await getDb().collection('doc_formats').find({}).toArray();
+            res.json(formats.map(f => ({ 
+                id: f._id.toString(), 
+                type: f.type, 
+                fileName: f.fileName,
+                filePath: f.filePath,
+                instructions: f.instructions || ''
+            })));
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.post('/api/admin/formats', authenticateToken, upload.single('templateFile'), async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const { type, instructions } = req.body;
+            if (!type) return res.status(400).json({ error: 'El tipo de documento es requerido' });
+            
+            const newFormat = { type, instructions: instructions || '', created_at: new Date() };
+            
+            if (req.file) {
+                newFormat.fileName = req.file.originalname;
+                newFormat.filePath = '/uploads/formats/' + req.file.filename;
+            } else {
+                return res.status(400).json({ error: 'Debes subir un archivo de plantilla (.docx)' });
+            }
+
+            const result = await getDb().collection('doc_formats').insertOne(newFormat);
+            res.json({ success: true, id: result.insertedId });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.put('/api/admin/formats/:id', authenticateToken, upload.single('templateFile'), async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const _id = new mongoose.Types.ObjectId(req.params.id);
+            const { type, instructions } = req.body;
+            
+            const updateData = { type, instructions: instructions || '', updated_at: new Date() };
+            
+            if (req.file) {
+                updateData.fileName = req.file.originalname;
+                updateData.filePath = '/uploads/formats/' + req.file.filename;
+            }
+            
+            await getDb().collection('doc_formats').updateOne({ _id }, { $set: updateData });
+            res.json({ success: true });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.delete('/api/admin/formats/:id', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const _id = new mongoose.Types.ObjectId(req.params.id);
+            await getDb().collection('doc_formats').deleteOne({ _id });
             res.json({ success: true });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });

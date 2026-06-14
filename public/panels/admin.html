@@ -11,6 +11,7 @@
           <button id="adminTabManage" style="flex:1; padding:5px; font-size:12px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Gestión</button>
           <button id="adminTabBroadcast" style="flex:1; padding:5px; font-size:12px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Difusión</button>
           <button id="adminTabConfig" style="flex:1; padding:5px; font-size:12px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Config IA</button>
+          <button id="adminTabFormats" style="flex:1; padding:5px; font-size:12px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); border-radius:4px; cursor:pointer;">Formatos DOC</button>
         </div>
         <div id="adminUserList" style="flex:1; overflow-y:auto; padding:0 10px 10px; display:flex; flex-direction:column; gap:5px;"></div>
       </div>
@@ -69,11 +70,27 @@
           </table>
         </div>
         <div id="adminPromptView" style="display:none; flex:1; padding:20px; overflow-y:auto; flex-direction:column; gap:15px;">
-          <h3>Configuración del System Prompt (Cerebro de la IA)</h3>
-          <p style="font-size:13px; color:var(--text-light);">Este texto define la personalidad y las reglas que seguirá Planixa tanto en WhatsApp como en la Web App. Al editarlo, los cambios se aplican inmediatamente.</p>
-          <textarea id="adminPromptTextarea" style="flex:1; min-height:400px; padding:15px; border-radius:8px; border:1px solid var(--border); background:var(--bg-hover); color:var(--text); font-family:monospace; font-size:13px; resize:none;"></textarea>
-          <div style="text-align:right; margin-top:10px;">
-            <button id="adminSavePromptBtn" style="padding:10px 20px; background:var(--primary); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Guardar Prompt</button>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3>Agentes Especialistas (Prompts)</h3>
+              <p style="font-size:13px; color:var(--text-light);">Crea diferentes agentes. El Router de IA decidirá cuál usar automáticamente según el mensaje del usuario.</p>
+            </div>
+            <button id="adminNewPromptBtn" style="padding:8px 15px; background:var(--primary); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">+ Nuevo Agente</button>
+          </div>
+          <div id="adminPromptList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:15px; margin-top:10px;">
+            <!-- Prompts injected here -->
+          </div>
+        </div>
+        <div id="adminFormatView" style="display:none; flex:1; padding:20px; overflow-y:auto; flex-direction:column; gap:15px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3>Formatos Estrictos de Documentos</h3>
+              <p style="font-size:13px; color:var(--text-light);">Dicta la estructura exacta (títulos, tablas, columnas) que la IA debe usar para generar PDFs y Words.</p>
+            </div>
+            <button id="adminNewFormatBtn" style="padding:8px 15px; background:var(--accent); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">+ Nuevo Formato</button>
+          </div>
+          <div id="adminFormatList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:15px; margin-top:10px;">
+            <!-- Formats injected here -->
           </div>
         </div>
         <div id="adminChatView" style="display:none; flex:1; overflow-y:auto; padding:15px; flex-direction:column; gap:15px;">

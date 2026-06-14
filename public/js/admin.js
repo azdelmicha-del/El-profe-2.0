@@ -11,8 +11,8 @@ window.initAdminPanel = function() {
   }
 
   function switchAdminTab(activeTabId, activeViewId, callback) {
-    const tabs = ['adminTabDash', 'adminTabUsers', 'adminTabManage', 'adminTabBroadcast', 'adminTabConfig'];
-    const views = ['adminDashView', 'adminChatView', 'adminManageView', 'adminBroadcastView', 'adminPromptView'];
+    const tabs = ['adminTabDash', 'adminTabUsers', 'adminTabManage', 'adminTabBroadcast', 'adminTabConfig', 'adminTabFormats'];
+    const views = ['adminDashView', 'adminChatView', 'adminManageView', 'adminBroadcastView', 'adminPromptView', 'adminFormatView'];
     
     tabs.forEach(tab => {
       const el = document.getElementById(tab);
@@ -42,7 +42,8 @@ window.initAdminPanel = function() {
   document.getElementById('adminTabUsers')?.addEventListener('click', () => switchAdminTab('adminTabUsers', 'adminChatView'));
   document.getElementById('adminTabManage')?.addEventListener('click', () => switchAdminTab('adminTabManage', 'adminManageView', renderAdminManageTable));
   document.getElementById('adminTabBroadcast')?.addEventListener('click', () => switchAdminTab('adminTabBroadcast', 'adminBroadcastView'));
-  document.getElementById('adminTabConfig')?.addEventListener('click', () => switchAdminTab('adminTabConfig', 'adminPromptView', loadAdminConfig));
+  document.getElementById('adminTabConfig')?.addEventListener('click', () => switchAdminTab('adminTabConfig', 'adminPromptView', loadAdminPrompts));
+  document.getElementById('adminTabFormats')?.addEventListener('click', () => switchAdminTab('adminTabFormats', 'adminFormatView', loadAdminFormats));
 
 
   document.getElementById('adminSearchUsers')?.addEventListener('input', (e) => {
@@ -78,20 +79,17 @@ window.initAdminPanel = function() {
     }
   });
 
-  document.getElementById('adminSavePromptBtn')?.addEventListener('click', async () => {
-    const prompt = document.getElementById('adminPromptTextarea').value;
-    try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') },
-        body: JSON.stringify({ system_prompt: prompt })
-      });
-      if (res.ok) alert('Prompt guardado exitosamente.');
-      else alert('Error al guardar config');
-    } catch (err) {
-      alert('Error: ' + err.message);
-    }
-  });
+  // Prompts logic
+  document.getElementById('adminNewPromptBtn')?.addEventListener('click', () => openPromptModal(null));
+  document.getElementById('adminPromptCancelBtn')?.addEventListener('click', () => { document.getElementById('adminPromptModal').style.display = 'none'; });
+  document.getElementById('adminPromptSaveBtn')?.addEventListener('click', saveAdminPrompt);
+  document.getElementById('adminPromptDeleteBtn')?.addEventListener('click', deleteAdminPrompt);
+
+  // Formats logic
+  document.getElementById('adminNewFormatBtn')?.addEventListener('click', () => openFormatModal(null));
+  document.getElementById('adminFormatCancelBtn')?.addEventListener('click', () => { document.getElementById('adminFormatModal').style.display = 'none'; });
+  document.getElementById('adminFormatSaveBtn')?.addEventListener('click', saveAdminFormat);
+  document.getElementById('adminFormatDeleteBtn')?.addEventListener('click', deleteAdminFormat);
 
   // Admin AI Chat
   document.getElementById('adminAiSendBtn')?.addEventListener('click', sendAdminAiMessage);
@@ -99,6 +97,7 @@ window.initAdminPanel = function() {
     if (e.key === 'Enter') sendAdminAiMessage();
   });
 };
+
 
 async function loadAdminUsers() {
   try {
@@ -188,19 +187,203 @@ window.editUserMembership = function(userId, plan, expires) {
   document.getElementById('adminEditModal').style.display = 'flex';
 }
 
-async function loadAdminConfig() {
+// --- PROMPTS LOGIC ---
+let adminPrompts = [];
+
+async function loadAdminPrompts() {
   try {
-    const res = await fetch('/api/admin/settings', {
+    const res = await fetch('/api/admin/prompts', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') } });
+    if (res.ok) {
+      adminPrompts = await res.json();
+      renderAdminPrompts();
+    }
+  } catch (err) { console.error(err); }
+}
+
+function renderAdminPrompts() {
+  const list = document.getElementById('adminPromptList');
+  if (!list) return;
+  list.innerHTML = '';
+  adminPrompts.forEach(p => {
+    const card = document.createElement('div');
+    card.style.padding = '15px';
+    card.style.background = 'var(--bg-hover)';
+    card.style.border = '1px solid var(--border)';
+    card.style.borderRadius = '8px';
+    card.style.cursor = 'pointer';
+    card.innerHTML = `
+      <h4 style="margin:0 0 5px 0;">${p.name}</h4>
+      <p style="font-size:12px; color:var(--text-light); margin:0;">${(p.description || '').substring(0, 80)}...</p>
+    `;
+    card.onclick = () => openPromptModal(p);
+    list.appendChild(card);
+  });
+}
+
+function openPromptModal(prompt) {
+  document.getElementById('adminPromptModal').style.display = 'flex';
+  if (prompt) {
+    document.getElementById('adminPromptModalTitle').innerText = 'Editar Agente';
+    document.getElementById('adminPromptId').value = prompt.id;
+    document.getElementById('adminPromptName').value = prompt.name || '';
+    document.getElementById('adminPromptDesc').value = prompt.description || '';
+    document.getElementById('adminPromptContent').value = prompt.content || '';
+    document.getElementById('adminPromptDeleteBtn').style.display = 'block';
+  } else {
+    document.getElementById('adminPromptModalTitle').innerText = 'Nuevo Agente';
+    document.getElementById('adminPromptId').value = '';
+    document.getElementById('adminPromptName').value = '';
+    document.getElementById('adminPromptDesc').value = '';
+    document.getElementById('adminPromptContent').value = '';
+    document.getElementById('adminPromptDeleteBtn').style.display = 'none';
+  }
+}
+
+async function saveAdminPrompt() {
+  const id = document.getElementById('adminPromptId').value;
+  const name = document.getElementById('adminPromptName').value;
+  const description = document.getElementById('adminPromptDesc').value;
+  const content = document.getElementById('adminPromptContent').value;
+  if (!name || !content) return alert('Nombre y Contenido son requeridos');
+  
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? '/api/admin/prompts/' + id : '/api/admin/prompts';
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') },
+      body: JSON.stringify({ name, description, content })
+    });
+    if (res.ok) {
+      document.getElementById('adminPromptModal').style.display = 'none';
+      loadAdminPrompts();
+    } else {
+      alert('Error al guardar el prompt');
+    }
+  } catch (err) { console.error(err); }
+}
+
+async function deleteAdminPrompt() {
+  const id = document.getElementById('adminPromptId').value;
+  if (!id) return;
+  if (!confirm('¿Seguro que deseas eliminar este agente?')) return;
+  try {
+    const res = await fetch('/api/admin/prompts/' + id, {
+      method: 'DELETE',
       headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') }
     });
     if (res.ok) {
-      const data = await res.json();
-      document.getElementById('adminPromptTextarea').value = data.system_prompt;
+      document.getElementById('adminPromptModal').style.display = 'none';
+      loadAdminPrompts();
     }
-  } catch (err) {
-    console.error('Error cargando settings', err);
-  }
+  } catch (err) { console.error(err); }
 }
+
+// --- FORMATS LOGIC ---
+let adminFormats = [];
+
+async function loadAdminFormats() {
+  try {
+    const res = await fetch('/api/admin/formats', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') } });
+    if (res.ok) {
+      adminFormats = await res.json();
+      renderAdminFormats();
+    }
+  } catch (err) { console.error(err); }
+}
+
+function renderAdminFormats() {
+  const list = document.getElementById('adminFormatList');
+  if (!list) return;
+  list.innerHTML = '';
+  adminFormats.forEach(f => {
+    const card = document.createElement('div');
+    card.style.padding = '15px';
+    card.style.background = 'var(--bg-hover)';
+    card.style.border = '1px solid var(--border)';
+    card.style.borderRadius = '8px';
+    card.style.cursor = 'pointer';
+    card.innerHTML = `
+      <h4 style="margin:0 0 5px 0;">${f.type}</h4>
+      <p style="font-size:12px; color:var(--text-light); margin:0;">${f.fileName || 'Plantilla.docx'}</p>
+    `;
+    card.onclick = () => openFormatModal(f);
+    list.appendChild(card);
+  });
+}
+
+function openFormatModal(format) {
+  document.getElementById('adminFormatModal').style.display = 'flex';
+  if (format) {
+    document.getElementById('adminFormatModalTitle').innerText = 'Editar Formato';
+    document.getElementById('adminFormatId').value = format.id;
+    document.getElementById('adminFormatType').value = format.type || '';
+    document.getElementById('adminFormatInstructions').value = format.instructions || '';
+    document.getElementById('adminFormatFileStatus').innerText = 'Archivo actual: ' + (format.fileName || 'Ninguno');
+    document.getElementById('adminFormatDeleteBtn').style.display = 'block';
+  } else {
+    document.getElementById('adminFormatModalTitle').innerText = 'Nuevo Formato';
+    document.getElementById('adminFormatId').value = '';
+    document.getElementById('adminFormatType').value = '';
+    document.getElementById('adminFormatInstructions').value = '';
+    document.getElementById('adminFormatFileStatus').innerText = '';
+    document.getElementById('adminFormatDeleteBtn').style.display = 'none';
+  }
+  document.getElementById('adminFormatFile').value = '';
+}
+
+async function saveAdminFormat() {
+  const id = document.getElementById('adminFormatId').value;
+  const type = document.getElementById('adminFormatType').value;
+  const instructions = document.getElementById('adminFormatInstructions').value;
+  const fileInput = document.getElementById('adminFormatFile');
+  
+  if (!type) return alert('El tipo es requerido');
+  if (!id && (!fileInput.files || fileInput.files.length === 0)) {
+    return alert('Debes subir un archivo .docx para crear un formato.');
+  }
+  
+  const formData = new FormData();
+  formData.append('type', type);
+  formData.append('instructions', instructions);
+  if (fileInput.files.length > 0) {
+    formData.append('templateFile', fileInput.files[0]);
+  }
+  
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? '/api/admin/formats/' + id : '/api/admin/formats';
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') },
+      body: formData
+    });
+    if (res.ok) {
+      document.getElementById('adminFormatModal').style.display = 'none';
+      loadAdminFormats();
+    } else {
+      const data = await res.json();
+      alert('Error al guardar el formato: ' + (data.error || 'Desconocido'));
+    }
+  } catch (err) { console.error(err); }
+}
+
+async function deleteAdminFormat() {
+  const id = document.getElementById('adminFormatId').value;
+  if (!id) return;
+  if (!confirm('¿Seguro que deseas eliminar este formato?')) return;
+  try {
+    const res = await fetch('/api/admin/formats/' + id, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') }
+    });
+    if (res.ok) {
+      document.getElementById('adminFormatModal').style.display = 'none';
+      loadAdminFormats();
+    }
+  } catch (err) { console.error(err); }
+}
+
 
 window.deleteAdminUser = async function(id) {
   if (!confirm('¿Seguro que deseas eliminar a este usuario por completo? Se borrarán sus conversaciones también.')) return;

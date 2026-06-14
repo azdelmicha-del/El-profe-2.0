@@ -301,3 +301,60 @@
     </div>
   </div>
 </div>
+
+<div id="adminPromptModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+  <div style="background:var(--bg); padding:20px; border-radius:12px; width:500px; max-width:90%;">
+    <h3 id="adminPromptModalTitle">Agente Especialista</h3>
+    <input type="hidden" id="adminPromptId">
+    <div style="margin-top:15px;">
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Nombre del Especialista</label>
+      <input type="text" id="adminPromptName" placeholder="Ej: Especialista en Matemáticas" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
+    </div>
+    <div style="margin-top:15px;">
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Descripción para el Enrutador (Crucial)</label>
+      <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Instrucción corta para que el Router sepa cuándo usar este agente.</p>
+      <input type="text" id="adminPromptDesc" placeholder="Ej: Usa este prompt SOLO si el usuario pide una evaluación de matemáticas." style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
+    </div>
+    <div style="margin-top:15px;">
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Contenido del Prompt (Cerebro)</label>
+      <textarea id="adminPromptContent" rows="8" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); font-family:monospace; font-size:12px; resize:vertical;"></textarea>
+    </div>
+    <div style="margin-top:20px; display:flex; gap:10px; justify-content:space-between;">
+      <button id="adminPromptDeleteBtn" style="padding:8px 15px; border-radius:6px; background:#dc2626; color:white; border:none; cursor:pointer; display:none;">Eliminar</button>
+      <div style="display:flex; gap:10px; margin-left:auto;">
+        <button id="adminPromptCancelBtn" style="padding:8px 15px; border-radius:6px; background:transparent; color:var(--text); border:1px solid var(--border); cursor:pointer;">Cancelar</button>
+        <button id="adminPromptSaveBtn" style="padding:8px 15px; border-radius:6px; background:var(--primary); color:white; border:none; cursor:pointer;">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="adminFormatModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+  <div style="background:var(--bg); padding:20px; border-radius:12px; width:500px; max-width:90%;">
+    <h3 id="adminFormatModalTitle">Formato Documental (PDF/Word)</h3>
+    <input type="hidden" id="adminFormatId">
+    <div style="margin-top:15px;">
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Tipo de Documento (Clave)</label>
+      <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Ejemplo: "Planificación", "Examen", "Rúbrica". Esto enlaza el formato con la intención.</p>
+      <input type="text" id="adminFormatType" placeholder="Ej: Examen" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
+    </div>
+    <div style="margin-top:15px;">
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Plantilla Word (.docx)</label>
+      <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Sube el documento Word con las etiquetas {{variables}}.</p>
+      <input type="file" id="adminFormatFile" accept=".docx" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
+      <p id="adminFormatFileStatus" style="font-size:11px; color:var(--primary); margin-top:5px;"></p>
+    </div>
+    <div style="margin-top:15px;">
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Instrucciones para la IA (Opcional)</label>
+      <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Instrucciones extra para que la IA sepa cómo rellenar las etiquetas.</p>
+      <textarea id="adminFormatInstructions" rows="3" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); font-size:12px; resize:vertical;"></textarea>
+    </div>
+    <div style="margin-top:20px; display:flex; gap:10px; justify-content:space-between;">
+      <button id="adminFormatDeleteBtn" style="padding:8px 15px; border-radius:6px; background:#dc2626; color:white; border:none; cursor:pointer; display:none;">Eliminar</button>
+      <div style="display:flex; gap:10px; margin-left:auto;">
+        <button id="adminFormatCancelBtn" style="padding:8px 15px; border-radius:6px; background:transparent; color:var(--text); border:1px solid var(--border); cursor:pointer;">Cancelar</button>
+        <button id="adminFormatSaveBtn" style="padding:8px 15px; border-radius:6px; background:var(--accent); color:white; border:none; cursor:pointer;">Guardar Formato</button>
+      </div>
+    </div>
+  </div>
+</div>

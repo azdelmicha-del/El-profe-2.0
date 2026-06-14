@@ -1,7 +1,10 @@
 const { authenticateToken } = require('../middleware/auth');
 const { getDb } = require('../db');
-
-
+const fs = require('fs');
+const path = require('path');
+const PizZip = require('pizzip');
+const Docxtemplater = require('docxtemplater');
+const mongoose = require('mongoose');
 
 module.exports = function (app) {
     app.post('/chat', authenticateToken, async (req, res) => {
@@ -39,9 +42,99 @@ module.exports = function (app) {
             referencesBlock += '\n═════════════════════════════════════════════════\nUSA ESTOS DOCUMENTOS COMO REFERENCIA para crear las planificaciones.\n';
         }
 
-        let config = await getDb().collection('settings').findOne({ _id: 'global' });
-        const MINERD_SYSTEM_PROMPT = config?.system_prompt || `Eres "Planixa", asistente de planificación docente del MINERD. Responde en español dominicano.`;
+        let MINERD_SYSTEM_PROMPT = `Eres "Planixa", asistente de planificación docente del MINERD. Responde en español dominicano.`;
+        
+        try {
+            // Fetch prompts
+            const prompts = await getDb().collection('prompts').find({}).toArray();
+            let selectedPrompt = null;
 
+            if (prompts.length === 1) {
+                selectedPrompt = prompts[0];
+            } else if (prompts.length > 1) {
+                // --- AI ROUTER ---
+                const routerPrompt = `Eres un enrutador inteligente. Tienes los siguientes Especialistas (Prompts) disponibles:
+${prompts.map(p => `- ID: ${p._id.toString()} | Nombre: ${p.name} | Cuándo usar: ${p.description}`).join('\n')}
+
+El usuario ha dicho: "${message}"
+
+Responde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta solicitud. Si ninguno aplica claramente, responde con el ID del Especialista más general o principal.`;
+                
+                const routerRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [{ role: 'system', content: routerPrompt }],
+                        max_tokens: 50,
+                        temperature: 0
+                    })
+                });
+                
+                if (routerRes.ok) {
+                    const rData = await routerRes.json();
+                    const chosenId = rData.choices?.[0]?.message?.content?.trim();
+                    selectedPrompt = prompts.find(p => p._id.toString() === chosenId) || prompts[0];
+                } else {
+                    selectedPrompt = prompts[0];
+                }
+            }
+
+            if (selectedPrompt) {
+                MINERD_SYSTEM_PROMPT = selectedPrompt.content;
+            }
+
+            // --- FORMAT INJECTOR ---
+            const formats = await getDb().collection('doc_formats').find({}).toArray();
+            if (formats.length > 0) {
+                const formatMatcherPrompt = `Eres un clasificador. Revisa si el mensaje del usuario está pidiendo generar un documento. Formatos disponibles: ${formats.map(f => f.type).join(', ')}. Si pide uno de esos, responde EXACTAMENTE con el tipo. Si no, responde "NINGUNO".
+Mensaje: "${message}"`;
+                
+                const fRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                    body: JSON.stringify({
+                        model: 'gpt-4o-mini',
+                        messages: [{ role: 'system', content: formatMatcherPrompt }],
+                        max_tokens: 20,
+                        temperature: 0
+                    })
+                });
+
+                if (fRes.ok) {
+                    const fData = await fRes.json();
+                    const chosenType = fData.choices?.[0]?.message?.content?.trim();
+                    if (chosenType && chosenType !== "NINGUNO") {
+                        const matchedFormat = formats.find(f => f.type.toLowerCase() === chosenType.toLowerCase());
+                        if (matchedFormat) {
+                            let tmplIns = `\n\nREGLA ESTRICTA DE FORMATO VISUAL (PLANTILLA WORD):\nEl administrador ha asignado una plantilla Word para este documento.`;
+                            if (matchedFormat.instructions) tmplIns += `\nINSTRUCCIONES EXTRA DEL ADMIN: ${matchedFormat.instructions}`;
+                            
+                            tmplIns += `\n\nREGLA DE APROBACIÓN (MUY IMPORTANTE):
+1. Llena los datos que correspondan y preséntalos EN TEXTO NORMAL para que el profesor los lea. 
+2. AL FINAL del mensaje, OBLIGATORIAMENTE pregúntale: "¿Quedó todo bien? ¿Deseas que te genere este documento listo en Word?". 
+3. NO USES la etiqueta [GENERATE_WORD] en este momento.
+4. SÓLO usa [GENERATE_WORD] en tu SIGUIENTE mensaje si el profesor te responde que SÍ lo quiere en documento.
+
+CUANDO EL PROFESOR DE LA APROBACIÓN:
+Debes responder EXACTAMENTE con este formato:
+[GENERATE_WORD]
+\`\`\`json
+{
+  "etiqueta_del_word1": "Valor rellenado por ti",
+  "etiqueta_del_word2": "Valor rellenado por ti"
+}
+\`\`\`
+Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el contexto.`;
+                            MINERD_SYSTEM_PROMPT += tmplIns;
+                            req.pendingFormatId = matchedFormat._id.toString();
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error en AI Router", err);
+        }
         const systemWithRefs = MINERD_SYSTEM_PROMPT + profileBlock + referencesBlock;
 
         const messages = [
@@ -99,8 +192,49 @@ module.exports = function (app) {
         if (!text) text = await tryGemini();
         
         if (text) {
-            // Increment plans_count if the response is substantial (likely a planification)
-            if (text.length > 300 && user.plan !== 'lifetime' && !user.is_admin) {
+            if (text.includes('[GENERATE_WORD]')) {
+                try {
+                    let jsonData = {};
+                    const jsonMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+                    if (jsonMatch) {
+                        jsonData = JSON.parse(jsonMatch[1]);
+                    }
+
+                    if (req.pendingFormatId) {
+                        const formatDoc = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(req.pendingFormatId) });
+                        if (formatDoc && formatDoc.filePath) {
+                            const templatePath = path.join(__dirname, '../..', 'public', formatDoc.filePath);
+                            const outDir = path.join(__dirname, '../..', 'public', 'downloads');
+                            if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+                            
+                            const outFilename = `Documento-${user._id}-${Date.now()}.docx`;
+                            const outPath = path.join(outDir, outFilename);
+                            const outUrl = `/downloads/${outFilename}`;
+                            
+                            const content = fs.readFileSync(templatePath, 'binary');
+                            const zip = new PizZip(content);
+                            const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+                            
+                            doc.render(jsonData);
+                            
+                            const buf = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+                            fs.writeFileSync(outPath, buf);
+
+                            text = `Aquí tienes tu documento estructurado en Word, profe 📄✨:\n\n<a href="${outUrl}" target="_blank" download="${outFilename}" style="color:var(--primary); font-weight:bold; text-decoration:underline;">📥 Descargar Documento Word</a>`;
+                        } else {
+                            text = "Hubo un error localizando la plantilla original.";
+                        }
+                    } else {
+                        text = "Hubo un problema encontrando el formato de plantilla.";
+                    }
+                } catch(e) {
+                    console.error("Error generating word on web: ", e);
+                    text = "Ocurrió un error rellenando el documento Word.";
+                }
+            }
+
+            // Increment plans_count if the response is substantial or contains generation tags
+            if ((text.includes('[GENERATE_WORD]') || text.length > 500) && user.plan !== 'lifetime' && !user.is_admin) {
                 await getDb().collection('users').updateOne({ _id: user._id }, { $inc: { plans_count: 1 } });
             }
             return res.json({ response: text });
