@@ -84,8 +84,14 @@ Responde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta sol
                 MINERD_SYSTEM_PROMPT = selectedPrompt.content;
             }
 
+            const profileBlock = `\n\nDATOS DEL PROFESOR:\nNombre: ${userDoc.name || 'Profe'}\nGrado: ${userDoc.grade || 'No especificado'}\nÁrea/Materia: ${userDoc.area || 'No especificada'}\nCentro Educativo: ${userDoc.school || 'No especificado'}\nIdioma: ${userDoc.language || 'es'}\nUSA ESTOS DATOS PARA PERSONALIZAR TU RESPUESTA.\n`;
+        
+            let identityRule = `\n\nREGLA DE IDENTIDAD:\nAntes de enviar o comenzar la creación de CUALQUIER planificación o documento, verifica el "Nombre" en los DATOS DEL PROFESOR. Si el nombre es genérico (ej. "hola", "Profe", "Maestro") o está vacío, DEBES preguntarle cortésmente cuál es su nombre completo antes de generar el documento.`;
+
             // --- FORMAT INJECTOR ---
             const formats = await getDb().collection('doc_formats').find({}).toArray();
+            let hasFormat = false;
+
             if (formats.length > 0) {
                 const formatMatcherPrompt = `Eres un clasificador. Revisa si el mensaje del usuario está pidiendo generar un documento. Formatos disponibles: ${formats.map(f => f.type).join(', ')}. Si pide uno de esos, responde EXACTAMENTE con el tipo. Si no, responde "NINGUNO".
 Mensaje: "${message}"`;
@@ -107,6 +113,7 @@ Mensaje: "${message}"`;
                     if (chosenType && chosenType !== "NINGUNO") {
                         const matchedFormat = formats.find(f => f.type.toLowerCase() === chosenType.toLowerCase());
                         if (matchedFormat) {
+                            hasFormat = true;
                             let tmplIns = `\n\nREGLA ESTRICTA DE FORMATO VISUAL (PLANTILLA WORD):\nEl administrador ha asignado una plantilla Word para este documento.`;
                             if (matchedFormat.instructions) tmplIns += `\nINSTRUCCIONES EXTRA DEL ADMIN: ${matchedFormat.instructions}`;
                             
@@ -132,10 +139,14 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                     }
                 }
             }
+            
+            if (!hasFormat) {
+                MINERD_SYSTEM_PROMPT += `\n\nREGLA ESTRICTA DE DISPONIBILIDAD:\nSi notas que el usuario te está pidiendo explícitamente que le generes o crees una planificación, examen, rúbrica o cualquier documento estructurado, DEBES OBLIGATORIAMENTE rechazar la creación del mismo con este texto exacto:\n"Aún no tengo el recurso o diseño activo para esa solicitud. Sin embargo, puedo pasarte con servicio al cliente para poder ayudarte desde el sistema."\n(Nota: Si solo está haciendo una pregunta conversacional, charlando, o pidiendo consejos/ideas sueltas, respóndele normalmente. Esta prohibición es SOLO para generar documentos formales o planificaciones estructuradas).`;
+            }
         } catch (err) {
             console.error("Error en AI Router", err);
         }
-        const systemWithRefs = MINERD_SYSTEM_PROMPT + profileBlock + referencesBlock;
+        const systemWithRefs = MINERD_SYSTEM_PROMPT + profileBlock + identityRule + referencesBlock;
 
         const messages = [
             { role: 'system', content: systemWithRefs },

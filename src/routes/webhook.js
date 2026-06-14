@@ -168,10 +168,12 @@ Responde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta sol
                 
                 // Inject User Profile Info
                 MINERD_SYSTEM_PROMPT += `\n\nDATOS DEL PROFESOR:\nNombre: ${user.name || 'Profe'}\nGrado: ${user.grade || 'No especificado'}\nÁrea/Materia: ${user.area || 'No especificada'}\nCentro Educativo: ${user.school || 'No especificado'}\nUsa estos datos siempre que necesites rellenar información personal del profesor o adaptar la planificación a su grado/materia, a menos que el profesor indique algo distinto para esta solicitud en particular.`;
-
+                
+                MINERD_SYSTEM_PROMPT += `\n\nREGLA DE IDENTIDAD:\nAntes de enviar o comenzar la creación de CUALQUIER planificación o documento, verifica el "Nombre" en los DATOS DEL PROFESOR. Si el nombre es genérico (ej. "hola", "Profe", "Maestro") o está vacío, DEBES preguntarle cortésmente cuál es su nombre completo antes de generar el documento.`;
 
                 // --- FORMAT INJECTOR ---
                 const formats = await getDb().collection('doc_formats').find({}).toArray();
+                let hasFormat = false;
                 if (formats.length > 0) {
                     const formatMatcherPrompt = `Eres un clasificador. Revisa si el mensaje del usuario está pidiendo generar un documento. Formatos disponibles: ${formats.map(f => f.type).join(', ')}. Si pide uno de esos, responde EXACTAMENTE con el tipo. Si no, responde "NINGUNO".
 Mensaje: "${text}"`;
@@ -191,7 +193,9 @@ Mensaje: "${text}"`;
                         const fData = await fRes.json();
                         const chosenType = fData.choices?.[0]?.message?.content?.trim();
                         if (chosenType && chosenType !== "NINGUNO") {
+                            const matchedFormat = formats.find(f => f.type.toLowerCase() === chosenType.toLowerCase());
                             if (matchedFormat) {
+                                hasFormat = true;
                                 let tmplIns = `\n\nREGLA ESTRICTA DE FORMATO VISUAL (PLANTILLA WORD):\nEl administrador ha asignado una plantilla Word para este documento.`;
                                 if (matchedFormat.instructions) tmplIns += `\nINSTRUCCIONES EXTRA DEL ADMIN: ${matchedFormat.instructions}`;
                                 
@@ -217,6 +221,10 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                             }
                         }
                     }
+                }
+                
+                if (!hasFormat) {
+                    MINERD_SYSTEM_PROMPT += `\n\nREGLA ESTRICTA DE DISPONIBILIDAD:\nSi notas que el usuario te está pidiendo explícitamente que le generes o crees una planificación, examen, rúbrica o cualquier documento estructurado, DEBES OBLIGATORIAMENTE rechazar la creación del mismo con este texto exacto:\n"Aún no tengo el recurso o diseño activo para esa solicitud. Sin embargo, puedo pasarte con servicio al cliente para poder ayudarte desde el sistema."\n(Nota: Si solo está haciendo una pregunta conversacional, charlando, o pidiendo consejos/ideas sueltas, respóndele normalmente. Esta prohibición es SOLO para generar documentos formales o planificaciones estructuradas).`;
                 }
             } catch (err) {
                 console.error("Error en AI Router", err);
@@ -400,7 +408,7 @@ function createPdfFromConv(conv, user, outputPath) {
         doc.moveTo(leftMargin, doc.y).lineTo(pageWidth - leftMargin, doc.y).stroke('#ccc');
         doc.moveDown();
 
-        const titleText = conv.title || 'Planificación Docente';
+        const titleText = 'Planificación Docente';
         doc.fontSize(14).font('Helvetica-Bold').text(titleText, leftMargin, doc.y, { underline: true });
         doc.moveDown();
 
@@ -413,29 +421,27 @@ function createPdfFromConv(conv, user, outputPath) {
         doc.moveDown();
 
         const messages = conv.messages || [];
-        for (const msg of messages) {
-            if (msg.role === 'assistant' && msg.content.length > 100) {
-                if (doc.y > 700) doc.addPage();
-                
-                let content = String(msg.content || '').replace(/\[GENERATE_PDF\]/g, '');
-                
-                doc.fontSize(10).font('Helvetica').fillColor('#333');
-                const lines = content.split('\n');
-                for (const line of lines) {
-                    if (doc.y > 720) doc.addPage();
-                    if (line.trim().startsWith('-') || line.trim().startsWith('*')) {
-                        doc.text(`• ${line.replace(/^[-*]/, '').trim()}`, leftMargin + 10, doc.y);
-                    } else if (line.trim().startsWith('#')) {
-                        doc.moveDown(0.5);
-                        doc.font('Helvetica-Bold').fillColor('#111').text(line.replace(/^#+/, '').trim(), leftMargin, doc.y);
-                        doc.font('Helvetica').fillColor('#333');
-                    } else {
-                        doc.text(line, leftMargin, doc.y);
-                    }
-                }
-                doc.moveDown();
+        const planMessages = messages.filter(m => m.role === 'assistant' && m.content.length > 150 && !m.content.includes('[GENERATE_PDF]') && !m.content.includes('[GENERATE_WORD]'));
+        const lastPlanMsg = planMessages.length > 0 ? planMessages[planMessages.length - 1].content : 'No se encontró la planificación detallada en esta conversación.';
+
+        let content = String(lastPlanMsg).replace(/\[GENERATE_PDF\]/g, '');
+        content = content.replace(/\*\*/g, ''); // Remover negritas de markdown
+        
+        doc.fontSize(10).font('Helvetica').fillColor('#333');
+        const lines = content.split('\n');
+        for (const line of lines) {
+            if (doc.y > 720) doc.addPage();
+            if (line.trim().startsWith('-') || line.trim().startsWith('*')) {
+                doc.text(`• ${line.replace(/^[-*]/, '').trim()}`, leftMargin + 10, doc.y);
+            } else if (line.trim().startsWith('#')) {
+                doc.moveDown(0.5);
+                doc.font('Helvetica-Bold').fillColor('#111').text(line.replace(/^#+/, '').trim(), leftMargin, doc.y);
+                doc.font('Helvetica').fillColor('#333');
+            } else {
+                doc.text(line, leftMargin, doc.y);
             }
         }
+        doc.moveDown();
 
         doc.end();
         stream.on('finish', resolve);
