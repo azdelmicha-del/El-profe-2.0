@@ -679,7 +679,7 @@ async function switchTab(tab) {
     t.style.fontWeight = '';
     t.style.borderBottomColor = '';
   });
-  const panels = ['chat-main', 'adminPanel', 'calendarPanel', 'templatesPanel', 'studentsPanel', 'schedulePanel', 'annualPanel', 'statsPanel', 'remindersPanel', 'customTemplatesPanel', 'journalPanel', 'competenciasPanel', 'clientsPanel', 'evalSchedulePanel'];
+  const panels = ['chat-main', 'adminPanel', 'calendarPanel', 'templatesPanel', 'studentsPanel', 'schedulePanel', 'annualPanel', 'statsPanel', 'remindersPanel', 'customTemplatesPanel', 'journalPanel', 'competenciasPanel', 'clientsPanel', 'supervisorPanel', 'evalSchedulePanel'];
   const tabLower = tab.toLowerCase();
   for (const id of panels) {
     const el = $(id);
