@@ -103,7 +103,7 @@ module.exports = function (app) {
                     await getDb().collection('users').updateOne({ _id: user._id }, { $set: { name: text.slice(0, 50) } });
                 }
 
-                const confirmReply = '¡Excelente profe! Ya he guardado tus datos. ¿En qué puedo ayudarte hoy con tu planificación?';
+                const confirmReply = '¡Excelente profe! Ya he guardado tus datos.\n\n¿Quieres comenzar con una planificación diaria? ¿O prefieres una Unidad o Secuencia?';
                 await sendWhatsAppMessage(from, confirmReply);
                 return;
             }
