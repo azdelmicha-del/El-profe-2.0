@@ -93,7 +93,10 @@ async function enterApp() {
   $('appLayout').style.display = 'flex';
   currentUser = await api('GET', '/api/user');
   updateSidebarUser();
-  if (currentUser.is_admin) $('adminPanelBtn').style.display = 'inline-flex';
+  if (currentUser.is_admin) {
+    if ($('adminPanelBtn')) $('adminPanelBtn').style.display = 'inline-flex';
+    if ($('adminNavTab')) $('adminNavTab').style.display = 'inline-block';
+  }
   // Load chat panel first so its elements exist
   await loadPanelContent('chat-main');
   loadConversations();
@@ -147,70 +150,11 @@ async function saveProfile() {
   }
 }
 
-on("adminPanelBtn", "click", openAdminPanel);
-function closeAdminPanel() {
-  $('adminPanel').style.display = 'none';
-  $('chat-area').style.display = 'flex';
+on("adminPanelBtn", "click", () => {
   closeSidebar();
-}
-async function openAdminPanel() {
-  closeSidebar();
-  $('chat-area').style.display = 'none';
-  $('adminPanel').style.display = 'block';
-  const list = $('adminUsersList');
-  list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-light);">Cargando...</div>';
-  const res = await api('GET', '/api/admin/users');
-  if (!res.users) { list.innerHTML = '<div style="text-align:center;padding:30px;color:#dc2626;">Error al cargar usuarios</div>'; return; }
-  list.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;background:var(--card);border-radius:8px;overflow:hidden;box-shadow:var(--shadow);"><thead><tr style="background:#f8fafc;font-size:12px;text-transform:uppercase;color:var(--text-light);">' +
-    '<th style="padding:12px 14px;text-align:left;">#</th>' +
-    '<th style="padding:12px 14px;text-align:left;">Celular</th>' +
-    '<th style="padding:12px 14px;text-align:left;">Nombre</th>' +
-    '<th style="padding:12px 14px;text-align:left;">Rol</th>' +
-    '<th style="padding:12px 14px;text-align:left;">Registro</th>' +
-    '<th style="padding:12px 14px;text-align:right;">Acción</th>' +
-    '</tr></thead><tbody>' +
-    res.users.map((u, i) => {
-      const isSelf = u.id === currentUser?.id;
-      return '<tr style="border-bottom:1px solid var(--border);transition:background 0.15s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">' +
-        '<td style="padding:12px 14px;color:var(--text-light);font-size:12px;">' + (i + 1) + '</td>' +
-        '<td style="padding:12px 14px;font-weight:600;">' + escHtml(u.phone) + '</td>' +
-        '<td style="padding:12px 14px;">' + escHtml(u.name || '-') + '</td>' +
-        '<td style="padding:12px 14px;"><span style="display:inline-block;background:' + (u.is_admin ? '#dbeafe' : '#f1f5f9') + ';color:' + (u.is_admin ? '#1a56db' : '#64748b') + ';padding:2px 12px;border-radius:12px;font-size:12px;font-weight:600;">' + (u.is_admin ? 'Admin' : 'Docente') + '</span></td>' +
-        '<td style="padding:12px 14px;font-size:12px;color:var(--text-light);">' + timeAgo(u.created_at) + '</td>' +
-        '<td style="padding:12px 14px;text-align:right;white-space:nowrap;">' +
-        (isSelf ? '<span style="font-size:12px;color:var(--text-light);font-style:italic;">Tú</span>' :
-        '<button class="admin-edit-btn" data-id="' + u.id + '" data-name="' + escHtml(u.name || '') + '" data-phone="' + escHtml(u.phone) + '" data-admin="' + u.is_admin + '" style="background:var(--primary);border:none;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;margin-right:6px;cursor:pointer;transition:opacity 0.2s;" onmouseover="this.style.opacity=\'0.8\'" onmouseout="this.style.opacity=\'1\'">Editar</button>' +
-        '<button class="admin-del-btn" data-id="' + u.id + '" data-name="' + escHtml(u.name || u.phone) + '" style="background:#dc2626;border:none;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:opacity 0.2s;" onmouseover="this.style.opacity=\'0.8\'" onmouseout="this.style.opacity=\'1\'">Eliminar</button>') +
-        '</td></tr>';
-    }).join('') +
-    '</tbody></table></div>';
-
-  list.querySelectorAll('.admin-edit-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const name = prompt('Nombre:', btn.dataset.name);
-      if (name === null) return;
-      const phone = prompt('Celular:', btn.dataset.phone);
-      if (phone === null) return;
-      const isAdmin = confirm('¿Hacer admin a este usuario?');
-      Promise.all([
-        api('PUT', '/api/admin/users/' + btn.dataset.id + '/role', { is_admin: isAdmin }),
-        api('PUT', '/api/admin/users/' + btn.dataset.id, { name: name.trim(), phone: phone.trim() })
-      ]).then(() => {
-        showToast('Usuario actualizado', 'success');
-        openAdminPanel();
-      });
-    });
-  });
-  list.querySelectorAll('.admin-del-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!confirm('¿Eliminar a ' + btn.dataset.name + '? También se borrarán sus conversaciones y referencias.')) return;
-      api('DELETE', '/api/admin/users/' + btn.dataset.id).then(r => {
-        if (r.success) { showToast('Usuario eliminado', 'success'); openAdminPanel(); }
-        else showToast(r.error || 'Error', 'error');
-      });
-    });
-  });
-}
+  switchTab('admin');
+  if (typeof loadAdminUsers === 'function') loadAdminUsers();
+});
 
 on("logoutBtn", "click", () => {
   localStorage.removeItem('planif_token');

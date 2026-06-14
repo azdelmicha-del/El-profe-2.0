@@ -41,7 +41,7 @@ module.exports = function (app) {
             let user = await getDb().collection('users').findOne({ phone: from });
             if (!user) {
                 const hashed = await bcrypt.hash(from.slice(-6), 12);
-                const result = await getDb().collection('users').insertOne({ phone: from, password: hashed, name: '', grade: '', area: '', school: '', role: 'teacher', is_admin: false, plan: 'free', plan_expires: null, created_at: new Date() });
+                const result = await getDb().collection('users').insertOne({ phone: from, password: hashed, name: '', grade: '', area: '', school: '', role: 'teacher', is_admin: false, plan: 'trial', plan_expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), created_at: new Date() });
                 userId = result.insertedId.toString();
                 user = await getDb().collection('users').findOne({ _id: new mongoose.Types.ObjectId(userId) });
                 const welcomeReply = '¡Hola, profe! \n\nA partir de hoy voy a ser tu asistente de planificaciones.\n\nPuedo ayudarte a crear unidades, secuencias, planificaciones diarias, rúbricas, listas de cotejo, evaluaciones y actividades.\n\nAntes de empezar, cuéntame:\n📌 ¿Cuál es tu nombre?\n📌 ¿Qué grado y área trabajas normalmente?\n\nAsí puedo guardar tus planificaciones organizadas y adaptadas a ti.';
@@ -49,6 +49,20 @@ module.exports = function (app) {
                 return;
             }
             userId = user._id.toString();
+
+            // --- SUSCRIPTION CHECK ---
+            if (user.plan !== 'lifetime' && !user.is_admin) {
+                const now = new Date();
+                const expires = user.plan_expires ? new Date(user.plan_expires) : null;
+                if (!expires || expires < now) {
+                    const isTrial = user.plan === 'trial';
+                    const expMsg = isTrial ? 'Tu período de prueba de 7 días ha finalizado. 😔' : 'Tu membresía ha expirado. 😔';
+                    const payMsg = `Hola profe. ${expMsg}\n\nPara seguir ahorrando horas de trabajo con mis planificaciones automáticas, por favor renueva tu plan:\n\n⭐ 1 Mes: $395 DOP\n⭐ 3 Meses: $1,066 DOP (-10%)\n⭐ 6 Meses: $2,014 DOP (-15%)\n⭐ 1 Año: $3,792 DOP (-20%)\n\n💳 Para pagar mediante transferencia bancaria (Banreservas/Popular) o PayPal, escríbenos a este mismo número para enviarte los datos.\n\nEn cuanto envíes el comprobante activaremos tu cuenta de inmediato. ¡Te espero!`;
+                    await sendWhatsAppMessage(from, payMsg);
+                    return;
+                }
+            }
+
             if (!user.name) {
                 await getDb().collection('users').updateOne({ _id: user._id }, { $set: { name: text } });
                 const confirmReply = '¡Excelente profe! Ya he guardado tus datos. ¿En qué puedo ayudarte hoy con tu planificación?';
