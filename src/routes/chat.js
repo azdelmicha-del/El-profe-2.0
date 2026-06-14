@@ -209,7 +209,7 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                             
                             const outFilename = `Documento-${user._id}-${Date.now()}.docx`;
                             const outPath = path.join(outDir, outFilename);
-                            const outUrl = `/downloads/${outFilename}`;
+                            const outUrl = `/public/downloads/${outFilename}`;
                             
                             const content = fs.readFileSync(templatePath, 'binary');
                             const zip = new PizZip(content);

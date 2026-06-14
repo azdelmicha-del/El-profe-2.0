@@ -292,7 +292,7 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                             
                             const outFilename = `Documento-${from}-${Date.now()}.docx`;
                             const outPath = path.join(outDir, outFilename);
-                            const outUrl = `https://planixa.onrender.com/downloads/${outFilename}`;
+                            const outUrl = `https://planixa.onrender.com/public/downloads/${outFilename}`;
                             
                             const content = fs.readFileSync(templatePath, 'binary');
                             const zip = new PizZip(content);
@@ -322,7 +322,7 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                 if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir, { recursive: true });
                 const pdfFilename = `planificacion-${from}-${Date.now()}.pdf`;
                 const pdfPath = path.join(pdfDir, pdfFilename);
-                const pdfUrl = `https://planixa.onrender.com/downloads/${pdfFilename}`;
+                const pdfUrl = `https://planixa.onrender.com/public/downloads/${pdfFilename}`;
                 
                 await createPdfFromConv(activeConv, user, pdfPath);
                 await sendWhatsAppMessage(from, "Aquí tienes tu planificación en formato PDF, profe 📄✨");
