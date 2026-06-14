@@ -50,8 +50,9 @@ module.exports = function (app) {
             }
             userId = user._id.toString();
             if (!user.name) {
-                const askReply = '¡Hola de nuevo, profe! \n\nAntes de empezar, dime tu nombre y el grado que normalmente trabajas para guardar tus planificaciones organizadas.';
-                await sendWhatsAppMessage(from, askReply);
+                await getDb().collection('users').updateOne({ _id: user._id }, { $set: { name: text } });
+                const confirmReply = '¡Excelente profe! Ya he guardado tus datos. ¿En qué puedo ayudarte hoy con tu planificación?';
+                await sendWhatsAppMessage(from, confirmReply);
                 return;
             }
 
