@@ -107,6 +107,8 @@ async function enterApp() {
     checkBoot();
     $('profLang').value = currentUser.lang || 'es';
     switchTab('admin');
+    if (typeof loadAdminUsers === 'function') loadAdminUsers();
+    if ($('adminTabUsers')) $('adminTabUsers').click();
   } else {
     // Load chat panel first so its elements exist
     await loadPanelContent('chat-main');
