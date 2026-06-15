@@ -29,17 +29,21 @@ module.exports = function (app) {
             // Get settings status
             const settings = await getDb().collection('settings').findOne({ _id: 'general' });
             const enabled = settings?.supervisor_enabled === true;
+            const rules = settings?.supervisor_rules || '';
             
-            res.json({ logs, enabled });
+            res.json({ logs, enabled, rules });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
     app.post('/api/admin/settings/supervisor', authenticateToken, async (req, res) => {
         if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
         try {
-            const enabled = req.body.enabled === true;
-            await getDb().collection('settings').updateOne({ _id: 'general' }, { $set: { supervisor_enabled: enabled } }, { upsert: true });
-            res.json({ success: true, enabled });
+            const updateFields = {};
+            if (req.body.enabled !== undefined) updateFields.supervisor_enabled = req.body.enabled === true;
+            if (req.body.rules !== undefined) updateFields.supervisor_rules = req.body.rules;
+            
+            await getDb().collection('settings').updateOne({ _id: 'general' }, { $set: updateFields }, { upsert: true });
+            res.json({ success: true });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
     app.get('/api/admin/users', authenticateToken, async (req, res) => {
@@ -498,6 +502,45 @@ Si no pide un PDF explícitamente, responde normalmente.`;
         try {
             const _id = new mongoose.Types.ObjectId(req.params.id);
             await getDb().collection('doc_formats').deleteOne({ _id });
+            res.json({ success: true });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    // --- BASE DE CONOCIMIENTOS ---
+    app.get('/api/admin/knowledge', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const items = await getDb().collection('knowledge').find({}).sort({ created_at: -1 }).toArray();
+            res.json({ items: items.map(i => ({ id: i._id.toString(), title: i.title, category: i.category, content: i.content, created_at: i.created_at })) });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.post('/api/admin/knowledge', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const { title, category, content } = req.body;
+            if (!title || !content) return res.status(400).json({ error: 'Título y Contenido son requeridos' });
+            const result = await getDb().collection('knowledge').insertOne({ title, category: category || 'General', content, created_at: new Date() });
+            res.json({ success: true, id: result.insertedId });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.put('/api/admin/knowledge/:id', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const _id = new mongoose.Types.ObjectId(req.params.id);
+            const { title, category, content } = req.body;
+            if (!title || !content) return res.status(400).json({ error: 'Título y Contenido son requeridos' });
+            await getDb().collection('knowledge').updateOne({ _id }, { $set: { title, category, content, updated_at: new Date() } });
+            res.json({ success: true });
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
+    app.delete('/api/admin/knowledge/:id', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const _id = new mongoose.Types.ObjectId(req.params.id);
+            await getDb().collection('knowledge').deleteOne({ _id });
             res.json({ success: true });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });

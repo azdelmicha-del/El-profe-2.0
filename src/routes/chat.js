@@ -150,7 +150,23 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
         } catch (err) {
             console.error("Error en AI Router", err);
         }
-        const systemWithRefs = MINERD_SYSTEM_PROMPT + profileBlock + identityRule + referencesBlock;
+
+        // --- GLOBAL KNOWLEDGE BASE ---
+        let globalKnowledgeBlock = '';
+        try {
+            const knowledgeItems = await getDb().collection('knowledge').find({}).toArray();
+            if (knowledgeItems && knowledgeItems.length > 0) {
+                globalKnowledgeBlock = '\n\n📚 BASE DE CONOCIMIENTOS OFICIAL (REGLAS Y DATOS GLOBALES OBLIGATORIOS):\n';
+                for (const item of knowledgeItems) {
+                    globalKnowledgeBlock += `\n[CATEGORÍA: ${item.category}] - ${item.title}:\n${item.content}\n---\n`;
+                }
+                globalKnowledgeBlock += 'USA ESTA BASE DE CONOCIMIENTOS COMO VERDAD ABSOLUTA para responder.\n';
+            }
+        } catch (err) {
+            console.error("Error fetching knowledge base", err);
+        }
+
+        const systemWithRefs = MINERD_SYSTEM_PROMPT + profileBlock + identityRule + referencesBlock + globalKnowledgeBlock;
 
         const messages = [
             { role: 'system', content: systemWithRefs },

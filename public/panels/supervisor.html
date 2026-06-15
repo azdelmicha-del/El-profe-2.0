@@ -10,6 +10,15 @@
     </div>
   </div>
 
+  <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+      <h3 style="font-size:16px; color:var(--primary);">⚙️ Reglas de Supervisión</h3>
+      <button id="saveSupervisorRulesBtn" style="padding:6px 12px; background:var(--primary); color:white; border:none; border-radius:6px; font-size:12px; cursor:pointer;">Guardar Reglas</button>
+    </div>
+    <p style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Define las reglas absolutas que el Supervisor usará para auditar y castigar los errores del Asistente (ej. "Nunca hables de política", "Usa tono formal").</p>
+    <textarea id="supervisorRulesInput" style="width:100%; height:100px; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:13px; resize:vertical;" placeholder="Escribe tus reglas aquí..."></textarea>
+  </div>
+
   <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px;">
     <h3 style="font-size:16px; margin-bottom:15px; color:#f59e0b;">Historial de Correcciones</h3>
     <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Aquí se muestran los casos donde el Supervisor IA intervino para corregir un borrador del Asistente antes de ser enviado al profesor.</p>
@@ -73,6 +82,8 @@ async function loadSupervisorLogs() {
     const res = await api('GET', '/api/admin/supervisor_logs');
     const toggle = document.getElementById('supervisorToggle');
     if (toggle) toggle.checked = res.enabled;
+    const rulesInput = document.getElementById('supervisorRulesInput');
+    if (rulesInput) rulesInput.value = res.rules || '';
     
     const tbody = document.getElementById('supervisorLogsBody');
     if (!res.logs || res.logs.length === 0) {
@@ -104,6 +115,18 @@ document.getElementById('supervisorToggle')?.addEventListener('change', async (e
   } catch (err) {
     alert('Error guardando configuración');
     e.target.checked = !enabled;
+  }
+});
+
+document.getElementById('saveSupervisorRulesBtn')?.addEventListener('click', async () => {
+  const rules = document.getElementById('supervisorRulesInput').value;
+  try {
+    await api('POST', '/api/admin/settings/supervisor', { rules });
+    if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Reglas guardadas exitosamente.');
+    else alert('Reglas guardadas exitosamente.');
+  } catch (err) {
+    if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Error guardando reglas');
+    else alert('Error guardando reglas');
   }
 });
 

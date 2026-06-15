@@ -40,12 +40,17 @@ INSTRUCCIONES DE SUPERVISIÓN:
 3. Si el borrador es excelente y cumple todo, responde ÚNICAMENTE con la palabra: APROBADO
 4. Si el borrador tiene errores, o es deficiente, NO des explicaciones. Reescribe la respuesta completa y correcta tú mismo de la manera en la que el Asistente debió responder. Tu respuesta reemplazará a la del asistente.`;
 
+        let finalSupervisorPrompt = supervisorPrompt;
+        if (settings.supervisor_rules) {
+            finalSupervisorPrompt += `\n\nREGLAS ADICIONALES DEL ADMINISTRADOR:\n${settings.supervisor_rules}`;
+        }
+
         const r = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
             body: JSON.stringify({ 
                 model: 'gpt-4o-mini', 
-                messages: [{ role: 'system', content: supervisorPrompt }],
+                messages: [{ role: 'system', content: finalSupervisorPrompt }],
                 max_tokens: 3000, 
                 temperature: 0.1 
             })

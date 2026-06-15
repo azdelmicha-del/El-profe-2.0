@@ -12,8 +12,8 @@ window.initAdminPanel = function() {
   }
 
   function switchAdminTab(activeTabId, activeViewId, callback) {
-    const tabs = ['adminTabDash', 'adminTabUsers', 'adminTabManage', 'adminTabBroadcast', 'adminTabConfig', 'adminTabFormats'];
-    const views = ['adminDashView', 'adminChatView', 'adminManageView', 'adminBroadcastView', 'adminPromptView', 'adminFormatView'];
+    const tabs = ['adminTabDash', 'adminTabUsers', 'adminTabManage', 'adminTabBroadcast', 'adminTabConfig', 'adminTabFormats', 'adminTabKnowledge'];
+    const views = ['adminDashView', 'adminChatView', 'adminManageView', 'adminBroadcastView', 'adminPromptView', 'adminFormatView', 'adminKnowledgeView'];
     
     tabs.forEach(tab => {
       const el = document.getElementById(tab);
@@ -56,8 +56,7 @@ window.initAdminPanel = function() {
   document.getElementById('adminTabBroadcast')?.addEventListener('click', () => switchAdminTab('adminTabBroadcast', 'adminBroadcastView'));
   document.getElementById('adminTabConfig')?.addEventListener('click', () => switchAdminTab('adminTabConfig', 'adminPromptView', loadAdminPrompts));
   document.getElementById('adminTabFormats')?.addEventListener('click', () => switchAdminTab('adminTabFormats', 'adminFormatView', loadAdminFormats));
-
-
+  document.getElementById('adminTabKnowledge')?.addEventListener('click', () => switchAdminTab('adminTabKnowledge', 'adminKnowledgeView', window.loadKnowledgeItems));
   document.getElementById('adminSearchUsers')?.addEventListener('input', (e) => {
     renderAdminUserList(e.target.value);
     if (document.getElementById('adminManageView').style.display === 'block') {
@@ -719,4 +718,190 @@ window.initFinancePanel = function() {
   };
 
   loadFinanceData();
+};
+
+/* =========================================================================
+   KNOWLEDGE PANEL
+   ========================================================================= */
+let allKnowledge = [];
+
+window.initKnowledgePanel = async function() {
+  await window.loadKnowledgeItems();
+};
+
+window.loadKnowledgeItems = async function() {
+  const list = document.getElementById('knowledgeList');
+  if (!list) return;
+  try {
+    const res = await api('GET', '/api/admin/knowledge');
+    allKnowledge = res.items || [];
+    
+    if (allKnowledge.length === 0) {
+      list.innerHTML = '<div style="text-align:center; padding:40px; background:var(--card); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);">No hay conocimientos agregados. Haz clic en "Nuevo Conocimiento" para empezar.</div>';
+      return;
+    }
+    
+    list.innerHTML = allKnowledge.map(k => `
+      <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:15px; display:flex; justify-content:space-between; align-items:flex-start;">
+        <div style="flex:1; overflow:hidden;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
+            <span style="font-size:10px; padding:3px 8px; background:rgba(139, 92, 246, 0.2); color:#c4b5fd; border-radius:12px; font-weight:bold; text-transform:uppercase;">${k.category || 'General'}</span>
+            <h4 style="font-size:15px; margin:0; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${k.title}</h4>
+          </div>
+          <p style="font-size:12px; color:var(--text-muted); margin:0; margin-top:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+            ${k.content.replace(/</g, '&lt;')}
+          </p>
+        </div>
+        <div style="display:flex; gap:8px; margin-left:15px;">
+          <button onclick="window.editKnowledge('${k.id}')" style="background:rgba(255,255,255,0.1); color:var(--text); border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Editar</button>
+          <button onclick="window.deleteKnowledge('${k.id}')" style="background:rgba(239, 68, 68, 0.2); color:#fca5a5; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Eliminar</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error(e);
+    list.innerHTML = '<div style="color:red; padding:20px; text-align:center;">Error al cargar: ' + (e.message || e) + '</div>';
+  }
+};
+
+window.openKnowledgeModal = function() {
+  document.getElementById('kId').value = '';
+  document.getElementById('kTitle').value = '';
+  document.getElementById('kCategory').value = '';
+  document.getElementById('kContent').value = '';
+  document.getElementById('knowledgeModalTitle').textContent = 'Nuevo Conocimiento';
+  document.getElementById('knowledgeModal').style.display = 'flex';
+};
+
+window.closeKnowledgeModal = function() {
+  document.getElementById('knowledgeModal').style.display = 'none';
+};
+
+window.editKnowledge = function(id) {
+  const k = allKnowledge.find(x => x.id === id);
+  if (!k) return;
+  document.getElementById('kId').value = k.id;
+  document.getElementById('kTitle').value = k.title;
+  document.getElementById('kCategory').value = k.category;
+  document.getElementById('kContent').value = k.content;
+  document.getElementById('knowledgeModalTitle').textContent = 'Editar Conocimiento';
+  document.getElementById('knowledgeModal').style.display = 'flex';
+};
+
+window.saveKnowledge = async function() {
+  const id = document.getElementById('kId').value;
+  const title = document.getElementById('kTitle').value.trim();
+  const category = document.getElementById('kCategory').value.trim();
+  const content = document.getElementById('kContent').value.trim();
+  
+  if (!title || !content) {
+    if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Título y Contenido son obligatorios');
+    else alert('Título y Contenido son obligatorios');
+    return;
+  }
+  
+  try {
+    if (id) {
+      await api('PUT', '/api/admin/knowledge/' + id, { title, category, content });
+    } else {
+      await api('POST', '/api/admin/knowledge', { title, category, content });
+    }
+    window.closeKnowledgeModal();
+    window.loadKnowledgeItems();
+  } catch (e) {
+    if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Error al guardar');
+    else alert('Error al guardar');
+  }
+};
+
+window.deleteKnowledge = async function(id) {
+  let confirmDelete = false;
+  if (typeof PremiumModal !== 'undefined') {
+      confirmDelete = await PremiumModal.confirm('¿Seguro que deseas eliminar este conocimiento? La IA dejará de usarlo.');
+  } else {
+      confirmDelete = confirm('¿Seguro que deseas eliminar este conocimiento? La IA dejará de usarlo.');
+  }
+  
+  if (!confirmDelete) return;
+  
+  try {
+    await api('DELETE', '/api/admin/knowledge/' + id);
+    window.loadKnowledgeItems();
+  } catch (e) {
+    if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Error al eliminar');
+    else alert('Error al eliminar');
+  }
+};
+
+/* =========================================================================
+   SUPERVISOR PANEL
+   ========================================================================= */
+
+window.initSupervisorPanel = async function() {
+  await window.loadSupervisorLogs();
+  
+  const toggle = document.getElementById('supervisorToggle');
+  if (toggle && !toggle.hasAttribute('data-bound')) {
+    toggle.setAttribute('data-bound', 'true');
+    toggle.addEventListener('change', async (e) => {
+      const enabled = e.target.checked;
+      try {
+        await api('POST', '/api/admin/settings/supervisor', { enabled });
+        if (typeof PremiumModal !== 'undefined') await PremiumModal.alert(`Supervisor IA ${enabled ? 'Activado' : 'Desactivado'}`);
+        else alert(`Supervisor IA ${enabled ? 'Activado' : 'Desactivado'}`);
+      } catch (err) {
+        if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Error guardando configuración');
+        else alert('Error guardando configuración');
+        e.target.checked = !enabled;
+      }
+    });
+  }
+
+  const saveBtn = document.getElementById('saveSupervisorRulesBtn');
+  if (saveBtn && !saveBtn.hasAttribute('data-bound')) {
+    saveBtn.setAttribute('data-bound', 'true');
+    saveBtn.addEventListener('click', async () => {
+      const rules = document.getElementById('supervisorRulesInput').value;
+      try {
+        await api('POST', '/api/admin/settings/supervisor', { rules });
+        if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Reglas guardadas exitosamente.');
+        else alert('Reglas guardadas exitosamente.');
+      } catch (err) {
+        if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Error guardando reglas');
+        else alert('Error guardando reglas');
+      }
+    });
+  }
+};
+
+window.loadSupervisorLogs = async function() {
+  try {
+    const res = await api('GET', '/api/admin/supervisor_logs');
+    const toggle = document.getElementById('supervisorToggle');
+    if (toggle) toggle.checked = res.enabled;
+    const rulesInput = document.getElementById('supervisorRulesInput');
+    if (rulesInput) rulesInput.value = res.rules || '';
+    
+    const tbody = document.getElementById('supervisorLogsBody');
+    if (!tbody) return;
+    if (!res.logs || res.logs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No hay correcciones registradas aún. El Asistente lo ha hecho todo perfecto o el supervisor está apagado.</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = res.logs.map(log => `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:10px;">${new Date(log.date).toLocaleString()}</td>
+        <td style="padding:10px;">${log.userId || 'Desconocido'}</td>
+        <td style="padding:10px;" class="log-cell" title="${log.userRequest.replace(/"/g, '&quot;')}">${log.userRequest}</td>
+        <td style="padding:10px; color:#ef4444;" class="log-cell" title="${log.draftResponse.replace(/"/g, '&quot;')}">${log.draftResponse}</td>
+        <td style="padding:10px; color:#10b981;" class="log-cell" title="${log.correctedResponse.replace(/"/g, '&quot;')}">${log.correctedResponse}</td>
+      </tr>
+    `).join('');
+    
+  } catch (err) {
+    console.error("Error cargando supervisor", err);
+    const tbody = document.getElementById('supervisorLogsBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:red;">Error cargando registros.</td></tr>';
+  }
 };

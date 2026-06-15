@@ -666,6 +666,7 @@ async function loadPanelContent(id) {
     panelCache.add(id);
     if (name === 'admin' && typeof initAdminPanel === 'function') initAdminPanel();
     if (name === 'finance' && typeof initFinancePanel === 'function') initFinancePanel();
+    if (name === 'supervisor' && typeof initSupervisorPanel === 'function') initSupervisorPanel();
   } catch (e) { /* panel file not available */ }
 }
 
@@ -681,7 +682,7 @@ async function switchTab(tab) {
     t.style.fontWeight = '';
     t.style.borderBottomColor = '';
   });
-  const panels = ['chat-main', 'adminPanel', 'calendarPanel', 'templatesPanel', 'studentsPanel', 'schedulePanel', 'annualPanel', 'statsPanel', 'remindersPanel', 'customTemplatesPanel', 'journalPanel', 'competenciasPanel', 'clientsPanel', 'supervisorPanel', 'financePanel', 'evalSchedulePanel'];
+  const panels = ['chat-main', 'adminPanel', 'calendarPanel', 'templatesPanel', 'studentsPanel', 'schedulePanel', 'annualPanel', 'statsPanel', 'remindersPanel', 'customTemplatesPanel', 'journalPanel', 'competenciasPanel', 'clientsPanel', 'supervisorPanel', 'financePanel', 'knowledgePanel', 'evalSchedulePanel'];
   const tabLower = tab.toLowerCase();
   for (const id of panels) {
     const el = $(id);
