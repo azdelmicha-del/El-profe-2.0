@@ -350,20 +350,16 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                 await sendWhatsAppMessage(from, "Aquí tienes tu planificación en formato PDF, profe 📄✨");
                 await sendWhatsAppDocument(from, pdfUrl, pdfFilename);
             } else {
-                // Formatear Markdown a WhatsApp (Convertir ** en * y quitar hashtags de títulos)
                 let waReply = reply.replace(/\*\*/g, '*');
                 waReply = waReply.replace(/^###\s+/gm, '*');
                 waReply = waReply.replace(/^##\s+/gm, '*');
                 waReply = waReply.replace(/^#\s+/gm, '*');
+                waReply = waReply.replace(/\|\|\|/g, '\n\n'); // Reemplazar separador por saltos de línea normales
                 
-                // Dividir el mensaje si el bot usó el separador especial |||
-                const splitMessages = waReply.split('|||').map(s => s.trim()).filter(s => s.length > 0);
-                
-                for (const singleMsg of splitMessages) {
-                    const chunks = singleMsg.match(/.{1,4000}/g) || [];
-                    for (const chunk of chunks) {
-                        await sendWhatsAppMessage(from, chunk);
-                    }
+                // Enviar el mensaje completo en bloques de 4000 (Límite de WhatsApp) para que quede en un solo "bubble"
+                const chunks = waReply.match(/[\s\S]{1,4000}/g) || [];
+                for (const chunk of chunks) {
+                    await sendWhatsAppMessage(from, chunk);
                 }
             }
 
