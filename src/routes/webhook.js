@@ -43,7 +43,6 @@ module.exports = function (app) {
             if (msg.type === 'text') {
                 text = String(msg.text?.body || '').trim();
             } else {
-                await sendWhatsAppMessage(from, "Procesando tu archivo, un momento por favor... ⏳");
                 try {
                     let mediaId, mimeType;
                     if (msg.type === 'audio') {
