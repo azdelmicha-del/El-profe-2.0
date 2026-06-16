@@ -231,11 +231,20 @@ async function loadAdminPrompts() {
   } catch (err) { console.error(err); }
 }
 
-function renderAdminPrompts() {
+window.filterPrompts = function() {
+  const query = (document.getElementById('searchPromptInput').value || '').toLowerCase();
+  const filtered = adminPrompts.filter(p => 
+    (p.name || '').toLowerCase().includes(query) || 
+    (p.description || '').toLowerCase().includes(query)
+  );
+  renderAdminPrompts(filtered);
+};
+
+function renderAdminPrompts(items = adminPrompts) {
   const list = document.getElementById('adminPromptList');
   if (!list) return;
   list.innerHTML = '';
-  adminPrompts.forEach(p => {
+  items.forEach(p => {
     const card = document.createElement('div');
     card.style.padding = '15px';
     card.style.background = 'var(--bg-hover)';
@@ -260,6 +269,7 @@ function openPromptModal(prompt) {
     document.getElementById('adminPromptDesc').value = prompt.description || '';
     document.getElementById('adminPromptContent').value = prompt.content || '';
     document.getElementById('adminPromptDeleteBtn').style.display = 'block';
+    document.getElementById('countPrompt').innerText = (prompt.content || '').length + ' / 6000';
   } else {
     document.getElementById('adminPromptModalTitle').innerText = 'Nuevo Agente';
     document.getElementById('adminPromptId').value = '';
@@ -267,6 +277,7 @@ function openPromptModal(prompt) {
     document.getElementById('adminPromptDesc').value = '';
     document.getElementById('adminPromptContent').value = '';
     document.getElementById('adminPromptDeleteBtn').style.display = 'none';
+    document.getElementById('countPrompt').innerText = '0 / 6000';
   }
 }
 
@@ -323,11 +334,20 @@ async function loadAdminFormats() {
   } catch (err) { console.error(err); }
 }
 
-function renderAdminFormats() {
+window.filterFormats = function() {
+  const query = (document.getElementById('searchFormatInput').value || '').toLowerCase();
+  const filtered = adminFormats.filter(f => 
+    (f.type || '').toLowerCase().includes(query) || 
+    (f.instructions || '').toLowerCase().includes(query)
+  );
+  renderAdminFormats(filtered);
+};
+
+function renderAdminFormats(items = adminFormats) {
   const list = document.getElementById('adminFormatList');
   if (!list) return;
   list.innerHTML = '';
-  adminFormats.forEach(f => {
+  items.forEach(f => {
     const card = document.createElement('div');
     card.style.padding = '15px';
     card.style.background = 'var(--bg-hover)';
@@ -358,13 +378,16 @@ function openFormatModal(format) {
     document.getElementById('adminFormatInstructions').value = format.instructions || '';
     document.getElementById('adminFormatFileStatus').innerText = 'Archivo actual: ' + (format.fileName || 'Ninguno');
     document.getElementById('adminFormatDeleteBtn').style.display = 'block';
+    document.getElementById('countFormat').innerText = (format.instructions || '').length + ' / 3000';
   } else {
     document.getElementById('adminFormatModalTitle').innerText = 'Nuevo Formato';
     document.getElementById('adminFormatId').value = '';
     document.getElementById('adminFormatType').value = '';
+    document.getElementById('adminFormatType').value = '';
     document.getElementById('adminFormatInstructions').value = '';
     document.getElementById('adminFormatFileStatus').innerText = '';
     document.getElementById('adminFormatDeleteBtn').style.display = 'none';
+    document.getElementById('countFormat').innerText = '0 / 3000';
   }
   document.getElementById('adminFormatFile').value = '';
 }
@@ -865,31 +888,46 @@ window.loadKnowledgeItems = async function() {
     const res = await api('GET', '/api/admin/knowledge');
     allKnowledge = res.items || [];
     
-    if (allKnowledge.length === 0) {
-      list.innerHTML = '<div style="text-align:center; padding:40px; background:var(--card); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);">No hay conocimientos agregados. Haz clic en "Nuevo Conocimiento" para empezar.</div>';
-      return;
-    }
-    
-    list.innerHTML = allKnowledge.map(k => `
-      <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:15px; display:flex; justify-content:space-between; align-items:flex-start;">
-        <div style="flex:1; overflow:hidden;">
-          <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
-            <h4 style="font-size:15px; margin:0; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${k.title}</h4>
-          </div>
-          <p style="font-size:12px; color:var(--text-muted); margin:0; margin-top:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-            ${k.content.replace(/</g, '&lt;')}
-          </p>
-        </div>
-        <div style="display:flex; gap:8px; margin-left:15px;">
-          <button onclick="window.editKnowledge('${k.id}')" style="background:rgba(255,255,255,0.1); color:var(--text); border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Editar</button>
-          <button onclick="window.deleteKnowledge('${k.id}')" style="background:rgba(239, 68, 68, 0.2); color:#fca5a5; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Eliminar</button>
-        </div>
-      </div>
-    `).join('');
+    window.renderKnowledgeItems(allKnowledge);
   } catch (e) {
     console.error(e);
     list.innerHTML = '<div style="color:red; padding:20px; text-align:center;">Error al cargar: ' + (e.message || e) + '</div>';
   }
+};
+
+window.renderKnowledgeItems = function(items) {
+  const list = document.getElementById('knowledgeList');
+  if (!list) return;
+  if (items.length === 0) {
+    list.innerHTML = '<div style="text-align:center; padding:40px; background:var(--card); border-radius:12px; border:1px dashed var(--border); color:var(--text-muted);">No hay conocimientos que coincidan.</div>';
+    return;
+  }
+  
+  list.innerHTML = items.map(k => `
+    <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:15px; display:flex; justify-content:space-between; align-items:flex-start;">
+      <div style="flex:1; overflow:hidden;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
+          <h4 style="font-size:15px; margin:0; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${k.title}</h4>
+        </div>
+        <p style="font-size:12px; color:var(--text-muted); margin:0; margin-top:8px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+          ${k.content.replace(/</g, '&lt;')}
+        </p>
+      </div>
+      <div style="display:flex; gap:8px; margin-left:15px;">
+        <button onclick="window.editKnowledge('${k.id}')" style="background:rgba(255,255,255,0.1); color:var(--text); border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Editar</button>
+        <button onclick="window.deleteKnowledge('${k.id}')" style="background:rgba(239, 68, 68, 0.2); color:#fca5a5; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;">Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+};
+
+window.filterKnowledge = function() {
+  const query = (document.getElementById('searchKnowledgeInput').value || '').toLowerCase();
+  const filtered = allKnowledge.filter(k => 
+    (k.title || '').toLowerCase().includes(query) || 
+    (k.content || '').toLowerCase().includes(query)
+  );
+  window.renderKnowledgeItems(filtered);
 };
 
 window.openKnowledgeModal = function() {
@@ -898,6 +936,7 @@ window.openKnowledgeModal = function() {
   document.getElementById('kContent').value = '';
   document.getElementById('knowledgeModalTitle').textContent = 'Nuevo Conocimiento';
   document.getElementById('knowledgeModal').style.display = 'flex';
+  document.getElementById('countKnowledge').innerText = '0 / 4000';
 };
 
 window.closeKnowledgeModal = function() {
@@ -912,6 +951,7 @@ window.editKnowledge = function(id) {
   document.getElementById('kContent').value = k.content || '';
   document.getElementById('knowledgeModalTitle').textContent = 'Editar Conocimiento';
   document.getElementById('knowledgeModal').style.display = 'flex';
+  document.getElementById('countKnowledge').innerText = (k.content || '').length + ' / 4000';
 };
 
 window.saveKnowledge = async function() {
@@ -1005,8 +1045,19 @@ window.loadSupervisorLogs = async function() {
     const toggle = document.getElementById('supervisorToggle');
     if (toggle) toggle.checked = res.enabled;
     const rulesInput = document.getElementById('supervisorRulesInput');
-    if (rulesInput) rulesInput.value = res.rules || '';
-    
+    if (rulesInput) {
+      rulesInput.value = res.rules || `ERES EL SUPERVISOR DE CALIDAD Y SEGURIDAD DE PLANIXA.
+Tu único objetivo es evaluar la respuesta del Asistente y corregirla SI Y SOLO SI incumple estas reglas críticas:
+
+1. SEGURIDAD: El Asistente jamás debe responder preguntas de índole política, religiosa, o ajenas a la educación. Si lo hace, borra su respuesta y cámbiala por: "Lo siento, soy un asistente educativo y no estoy autorizado para conversar sobre ese tema."
+2. TONO Y LENGUAJE: El lenguaje debe ser estrictamente formal, profesional, empático y pedagógico. Si detectas agresividad o lenguaje coloquial, reescribe la respuesta.
+3. CURRÍCULO MINERD: Si el Asistente menciona leyes, áreas o grados que no pertenecen a República Dominicana, debes corregir la información.
+4. FORMATO: Asegúrate de que las listas y títulos estén bien formateados en Markdown.
+
+Si la respuesta original CUMPLE con todo, retorna el texto original intacto. Si incumple, retorna SÓLO la versión corregida.`;
+      const countEl = document.getElementById('countSupervisor');
+      if (countEl) countEl.innerText = rulesInput.value.length + ' / 4000';
+    }
     const tbody = document.getElementById('supervisorLogsBody');
     if (!tbody) return;
     if (!res.logs || res.logs.length === 0) {

@@ -216,7 +216,9 @@ Responde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta sol
                 }
                 
                 // Inject User Profile Info
-                MINERD_SYSTEM_PROMPT += `\n\nDATOS DEL PROFESOR:\nNombre: ${user.name || 'Profe'}\nGrado: ${user.grade || 'No especificado'}\nÁrea/Materia: ${user.area || 'No especificada'}\nCentro Educativo: ${user.school || 'No especificado'}\nUsa estos datos siempre que necesites rellenar información personal del profesor o adaptar la planificación a su grado/materia, a menos que el profesor indique algo distinto para esta solicitud en particular.`;
+                MINERD_SYSTEM_PROMPT += `\n\nDATOS DEL PROFESOR:\nNombre: ${user.name || 'Profe'}\nGrado: ${user.grade || 'No especificado'}\nÁrea/Materia: ${user.area || 'No especificada'}\nCentro Educativo: ${user.school || 'No especificado'}\nUsa estos datos siempre que necesites rellenar información personal del profesor o adaptar la planificación a su grado/materia, a menos que el profesor indique algo distinto para esta solicitud en particular.\n` +
+                (user.preferences ? `\nPREFERENCIAS GUARDADAS DEL PROFESOR:\n${user.preferences}\n(RESPETA ESTAS PREFERENCIAS ABSOLUTAMENTE)\n` : '') +
+                `\nREGLA DE APRENDIZAJE: Si el profesor expresa un gusto, preferencia, o cómo le gustan los formatos a futuro (ej. "no me des rubricas", "me gustan los juegos"), debes incluir AL FINAL de tu respuesta esta etiqueta exacta: [MEMORIA: la preferencia aquí]. Yo la guardaré en la base de datos.`;
                 
                 MINERD_SYSTEM_PROMPT += `\n\nREGLA DE IDENTIDAD:\nAntes de enviar o comenzar la creación de CUALQUIER planificación o documento, verifica el "Nombre" en los DATOS DEL PROFESOR. Si el nombre es genérico (ej. "hola", "Profe", "Maestro") o está vacío, DEBES preguntarle cortésmente cuál es su nombre completo antes de generar el documento.`;
 
@@ -389,6 +391,14 @@ async function processWord(buffer) {
 
             // -- PASO SUPERVISOR IA --
             reply = await callSupervisor(user._id.toString(), systemWithRefs, text, reply);
+
+            const memMatch = reply.match(/\[MEMORIA:\s*(.+?)\]/i);
+            if (memMatch) {
+                const newPref = memMatch[1].trim();
+                reply = reply.replace(/\[MEMORIA:\s*.+?\]/i, '').trim();
+                const currentPrefs = user.preferences ? user.preferences + '\n- ' + newPref : '- ' + newPref;
+                await getDb().collection('users').updateOne({ _id: user._id }, { $set: { preferences: currentPrefs } });
+            }
 
             if ((reply.includes('[GENERATE_PDF]') || reply.includes('[GENERATE_WORD]')) && user.plan !== 'lifetime' && !user.is_admin) {
                 await getDb().collection('users').updateOne({ _id: user._id }, { $inc: { plans_count: 1 } });

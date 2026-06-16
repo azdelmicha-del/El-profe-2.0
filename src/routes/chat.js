@@ -87,7 +87,9 @@ Responde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta sol
                 MINERD_SYSTEM_PROMPT = selectedPrompt.content;
             }
 
-            const profileBlock = `\n\nDATOS DEL PROFESOR:\nNombre: ${userDoc.name || 'Profe'}\nGrado: ${userDoc.grade || 'No especificado'}\nÁrea/Materia: ${userDoc.area || 'No especificada'}\nCentro Educativo: ${userDoc.school || 'No especificado'}\nIdioma: ${userDoc.language || 'es'}\nUSA ESTOS DATOS PARA PERSONALIZAR TU RESPUESTA.\n`;
+            const profileBlock = `\n\nDATOS DEL PROFESOR:\nNombre: ${userDoc.name || 'Profe'}\nGrado: ${userDoc.grade || 'No especificado'}\nÁrea/Materia: ${userDoc.area || 'No especificada'}\nCentro Educativo: ${userDoc.school || 'No especificado'}\nIdioma: ${userDoc.language || 'es'}\nUSA ESTOS DATOS PARA PERSONALIZAR TU RESPUESTA.\n` + 
+            (userDoc.preferences ? `\nPREFERENCIAS GUARDADAS DEL PROFESOR:\n${userDoc.preferences}\n(RESPETA ESTAS PREFERENCIAS ABSOLUTAMENTE)\n` : '') + 
+            `\nREGLA DE APRENDIZAJE: Si el profesor expresa un gusto, preferencia, o cómo le gustan los formatos a futuro (ej. "no me des rubricas", "me gustan los juegos"), debes incluir AL FINAL de tu respuesta esta etiqueta exacta: [MEMORIA: la preferencia aquí]. Yo la guardaré en la base de datos.`;
         
             let identityRule = `\n\nREGLA DE IDENTIDAD:\nAntes de enviar o comenzar la creación de CUALQUIER planificación o documento, verifica el "Nombre" en los DATOS DEL PROFESOR. Si el nombre es genérico (ej. "hola", "Profe", "Maestro") o está vacío, DEBES preguntarle cortésmente cuál es su nombre completo antes de generar el documento.`;
 
@@ -235,6 +237,14 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
         if (!text) text = await tryGemini();
         
         if (text) {
+            const memMatch = text.match(/\[MEMORIA:\s*(.+?)\]/i);
+            if (memMatch) {
+                const newPref = memMatch[1].trim();
+                text = text.replace(/\[MEMORIA:\s*.+?\]/i, '').trim();
+                const currentPrefs = userDoc.preferences ? userDoc.preferences + '\n- ' + newPref : '- ' + newPref;
+                await getDb().collection('users').updateOne({ _id: userDoc._id }, { $set: { preferences: currentPrefs } });
+            }
+
             if (text.includes('[GENERATE_WORD]')) {
                 try {
                     let jsonData = {};

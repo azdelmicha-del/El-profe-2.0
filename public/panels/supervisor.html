@@ -16,7 +16,8 @@
       <button id="saveSupervisorRulesBtn" style="padding:6px 12px; background:var(--primary); color:white; border:none; border-radius:6px; font-size:12px; cursor:pointer;">Guardar Reglas</button>
     </div>
     <p style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Define las reglas absolutas que el Supervisor usará para auditar y castigar los errores del Asistente (ej. "Nunca hables de política", "Usa tono formal").</p>
-    <textarea id="supervisorRulesInput" style="width:100%; height:100px; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:13px; resize:vertical;" placeholder="Escribe tus reglas aquí..."></textarea>
+    <textarea id="supervisorRulesInput" style="width:100%; height:150px; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:13px; resize:vertical;" placeholder="Escribe aquí las reglas absolutas que debe auditar el supervisor..." oninput="document.getElementById('countSupervisor').innerText = this.value.length + ' / 4000'"></textarea>
+    <div style="text-align:right; font-size:10px; color:var(--text-muted); margin-top:3px;" id="countSupervisor">0 / 4000</div>
   </div>
 
   <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px;">

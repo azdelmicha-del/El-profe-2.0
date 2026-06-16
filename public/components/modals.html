@@ -318,7 +318,8 @@
     </div>
     <div style="margin-top:15px;">
       <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Contenido del Prompt (Cerebro)</label>
-      <textarea id="adminPromptContent" rows="8" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); font-family:monospace; font-size:12px; resize:vertical;"></textarea>
+      <textarea id="adminPromptContent" rows="8" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); font-family:monospace; font-size:12px; resize:vertical;" oninput="document.getElementById('countPrompt').innerText = this.value.length + ' / 6000'"></textarea>
+      <div style="text-align:right; font-size:10px; color:var(--text-muted); margin-top:3px;" id="countPrompt">0 / 6000</div>
     </div>
     <div style="margin-top:20px; display:flex; gap:10px; justify-content:space-between;">
       <button id="adminPromptDeleteBtn" style="padding:8px 15px; border-radius:6px; background:#dc2626; color:white; border:none; cursor:pointer; display:none;">Eliminar</button>
@@ -348,7 +349,8 @@
     <div style="margin-top:15px;">
       <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Instrucciones para la IA (Opcional)</label>
       <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Instrucciones extra para que la IA sepa cómo rellenar las etiquetas.</p>
-      <textarea id="adminFormatInstructions" rows="3" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); font-size:12px; resize:vertical;"></textarea>
+      <textarea id="adminFormatInstructions" rows="3" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); font-size:12px; resize:vertical;" oninput="document.getElementById('countFormat').innerText = this.value.length + ' / 3000'"></textarea>
+      <div style="text-align:right; font-size:10px; color:var(--text-muted); margin-top:3px;" id="countFormat">0 / 3000</div>
     </div>
     <div style="margin-top:20px; display:flex; gap:10px; justify-content:space-between;">
       <button id="adminFormatDeleteBtn" style="padding:8px 15px; border-radius:6px; background:#dc2626; color:white; border:none; cursor:pointer; display:none;">Eliminar</button>
@@ -370,7 +372,8 @@
     </div>
     <div style="margin-top:15px;">
       <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Contenido (Verdad Absoluta)</label>
-      <textarea id="kContent" rows="8" placeholder="Pega la información aquí..." style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); font-size:13px; resize:vertical;"></textarea>
+      <textarea id="kContent" rows="8" placeholder="Pega la información aquí..." style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); font-size:13px; resize:vertical;" oninput="document.getElementById('countKnowledge').innerText = this.value.length + ' / 4000'"></textarea>
+      <div style="text-align:right; font-size:10px; color:var(--text-muted); margin-top:3px;" id="countKnowledge">0 / 4000</div>
     </div>
     <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
       <button onclick="window.closeKnowledgeModal()" style="padding:8px 15px; border-radius:6px; background:transparent; color:var(--text); border:1px solid var(--border); cursor:pointer;">Cancelar</button>
