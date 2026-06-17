@@ -38,7 +38,8 @@ INSTRUCCIONES DE SUPERVISIÓN:
 1. Revisa si el borrador cumple con las directrices (MINERD, formato solicitado, responde directamente a la petición).
 2. Asegúrate de que no haya información alucinada, y si se requiere el uso de separadores como |||, que estén bien aplicados.
 3. Si el borrador es excelente y cumple todo, responde ÚNICAMENTE con la palabra: APROBADO
-4. Si el borrador tiene errores, o es deficiente, NO des explicaciones. Reescribe la respuesta completa y correcta tú mismo de la manera en la que el Asistente debió responder. Tu respuesta reemplazará a la del asistente.`;
+4. Si el borrador tiene errores, o es deficiente, NO des explicaciones. Reescribe la respuesta completa y correcta tú mismo de la manera en la que el Asistente debió responder. Tu respuesta reemplazará a la del asistente.
+5. REGLA DE SISTEMA INQUEBRANTABLE: Si el borrador original incluye etiquetas internas como [GENERATE_WORD], [GENERATE_PDF] o [MEMORIA: ...], así como cualquier bloque \`\`\`json ... \`\`\`, es OBLIGATORIO que incluyas exactamente esas etiquetas y el JSON intacto en tu reescritura. Si las omites, el servidor fallará y no se generará el documento.`;
 
         let finalSupervisorPrompt = supervisorPrompt;
         if (settings.supervisor_rules) {
