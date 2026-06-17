@@ -519,7 +519,8 @@ Si no encuentras NADA, responde: {}`;
             // ═══════════════════════════════════════════════════════════════
             // GENERACIÓN FORZADA: La IA tenía instrucciones de formato pero
             // NO incluyó [GENERATE_WORD]. Se hace una 2da llamada forzada
-            // que extrae las etiquetas reales de la plantilla y genera el JSON.
+            // usando las instrucciones del admin (que ya tienen las variables
+            // exactas de la plantilla) para generar el JSON correcto.
             // ═══════════════════════════════════════════════════════════════
             const pendingFmtId = (activeConv && activeConv.pendingFormatId) || req.pendingFormatId;
             if (hasFormat && pendingFmtId && !reply.includes('[GENERATE_WORD]')) {
@@ -527,50 +528,55 @@ Si no encuentras NADA, responde: {}`;
                     const fmtDoc2 = await getDb().collection('doc_formats').findOne(
                         { _id: new mongoose.Types.ObjectId(pendingFmtId) }
                     );
-                    if (fmtDoc2 && fmtDoc2.filePath) {
-                        const tPath2 = path.join(PROJECT_ROOT, 'public', fmtDoc2.filePath);
-                        let templateKeys = [];
-                        try {
-                            const tContent2 = fs.readFileSync(tPath2, 'binary');
-                            const tZip2 = new PizZip(tContent2);
-                            const rawXml2 = tZip2.files['word/document.xml'] ? tZip2.files['word/document.xml'].asText() : '';
-                            const tagMatches2 = rawXml2.match(/\{\{([^}]+)\}\}/g) || [];
-                            templateKeys = [...new Set(tagMatches2.map(t => t.replace(/[{}]/g, '').trim()))];
-                            console.log('[FORCED GEN] Etiquetas plantilla:', templateKeys);
-                        } catch(tagErr) {
-                            console.log('[FORCED GEN] No se extrajeron tags del Word, se usaran keys genericas');
-                        }
-
+                    if (fmtDoc2) {
                         const convoContext = historyMessages
                             .map(m => (m.role === 'user' ? 'Profesor' : 'Asistente') + ': ' + m.content)
                             .join('\n') + '\nProfesor: ' + text;
 
-                        const keysInfo = templateKeys.length > 0
-                            ? 'Las etiquetas EXACTAS del documento son: ' + templateKeys.map(k => '{{' + k + '}}').join(', ') + '. Usa EXACTAMENTE esas claves en el JSON.'
-                            : 'Usa claves como: nombre_profesor, grado, area, tema, fecha, objetivo, actividades, recursos, evaluacion.';
+                        // Las instrucciones del admin ya contienen las variables EXACTAS de la plantilla
+                        const adminInstructions = fmtDoc2.instructions || 'Genera un JSON con los campos: nombre_completo_docente, grado_y_seccion, area_curricular, asignatura, fecha, actividades_de_inicio, actividades_de_desarrollo, actividades_de_cierre.';
 
-                        const forcedPrompt = 'Eres un generador de documentos. Usa la conversacion para rellenar la plantilla Word.\n\n'
-                            + keysInfo + '\n\nDatos del profesor:\n'
-                            + 'Nombre: ' + (user.name || 'No especificado') + '\n'
-                            + 'Grado: ' + (user.grade || 'No especificado') + '\n'
-                            + 'Area: ' + (user.area || 'No especificada') + '\n'
-                            + 'Centro: ' + (user.school || 'No especificado') + '\n\n'
-                            + 'Conversacion:\n' + convoContext + '\n\n'
-                            + 'Responde SOLO con [GENERATE_WORD] seguido del JSON. Sin texto adicional.\n'
-                            + '[GENERATE_WORD]\n```json\n{ "clave": "valor" }\n```';
+                        const forcedPrompt = `Eres un experto generador de planificaciones docentes del MINERD de República Dominicana.
+
+TAREA: Genera un JSON completo para rellenar una plantilla Word de planificación educativa.
+
+${adminInstructions}
+
+DATOS DEL PROFESOR (úsalos para los campos correspondientes):
+- Nombre: ${user.name || 'No especificado'}
+- Grado: ${user.grade || 'No especificado'}
+- Área/Materia: ${user.area || 'No especificada'}
+- Centro Educativo: ${user.school || 'No especificado'}
+- Fecha actual: ${new Date().toLocaleDateString('es-DO')}
+
+CONVERSACIÓN (extrae aquí el tema, grado, área y cualquier detalle adicional):
+${convoContext}
+
+REGLAS IMPORTANTES:
+1. Para los campos que NO tienes información, usa "" (cadena vacía).
+2. Para los campos de actividades (inicio, desarrollo, cierre), genera contenido educativo real y completo basado en el tema solicitado.
+3. NO escribas "N/A", "No disponible" ni "No aplica". Solo "" o el valor real.
+4. Responde ÚNICAMENTE con el bloque [GENERATE_WORD] seguido del JSON. Sin texto adicional antes ni después.
+
+[GENERATE_WORD]
+\`\`\`json
+{ "ejemplo_campo": "valor_de_ejemplo" }
+\`\`\``;
 
                         const fr2 = await fetch('https://api.openai.com/v1/chat/completions', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                            body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 2000, temperature: 0.2, messages: [{ role: 'user', content: forcedPrompt }] })
+                            body: JSON.stringify({ model: 'gpt-4o', max_tokens: 4000, temperature: 0.3, messages: [{ role: 'user', content: forcedPrompt }] })
                         });
                         if (fr2.ok) {
                             const fd2 = await fr2.json();
-                            if (fd2.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Generacion Forzada Word', 'gpt-4o-mini', fd2.usage);
+                            if (fd2.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Generacion Forzada Word', 'gpt-4o', fd2.usage);
                             const forcedReply = fd2?.choices?.[0]?.message?.content?.trim();
                             if (forcedReply && forcedReply.includes('[GENERATE_WORD]')) {
                                 reply = forcedReply;
-                                console.log('[FORCED GEN] Exito: [GENERATE_WORD] generado forzadamente');
+                                console.log('[FORCED GEN] Exito: [GENERATE_WORD] generado con instrucciones del admin');
+                            } else {
+                                console.warn('[FORCED GEN] La IA no incluyo [GENERATE_WORD] en la respuesta forzada');
                             }
                         }
                     }
@@ -734,7 +740,18 @@ Si no encuentras NADA, responde: {}`;
                         await sendWhatsAppMessage(from, 'Hubo un problema encontrando el formato.');
                     }
                 } catch(e) {
-                    console.error('Error generating word: ', e);
+                    // Docxtemplater tiene errores estructurados con e.properties.errors
+                    if (e.properties && e.properties.errors) {
+                        console.error('[WORD GEN] Errores de plantilla:',
+                            JSON.stringify(e.properties.errors.map(er => ({
+                                id: er.id,
+                                message: er.message,
+                                xtag: er.properties?.xtag
+                            })), null, 2)
+                        );
+                    } else {
+                        console.error('[WORD GEN] Error:', e.message, e.stack);
+                    }
                     await sendWhatsAppMessage(from, 'Ocurrió un error generando el documento. Por favor intenta de nuevo.');
                 }
             }
