@@ -70,6 +70,10 @@ window.initAdminPanel = function() {
 
   document.getElementById('adminEditSaveBtn')?.addEventListener('click', async () => {
     const userId = document.getElementById('adminEditUserId').value;
+    const name = document.getElementById('adminEditName').value.trim();
+    const grade = document.getElementById('adminEditGrade').value.trim();
+    const area = document.getElementById('adminEditArea').value.trim();
+    const school = document.getElementById('adminEditSchool').value.trim();
     const plan = document.getElementById('adminEditPlan').value;
     const expires = document.getElementById('adminEditExpires').value;
     const resetCount = document.getElementById('adminEditResetCount').checked;
@@ -77,13 +81,13 @@ window.initAdminPanel = function() {
       const res = await fetch('/api/admin/users/' + userId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') },
-        body: JSON.stringify({ plan, plan_expires: expires || null, resetCount })
+        body: JSON.stringify({ name, grade, area, school, plan, plan_expires: expires || null, resetCount })
       });
       if (res.ok) {
         document.getElementById('adminEditModal').style.display = 'none';
-        loadAdminUsers(); // refresh
+        loadAdminUsers();
       } else {
-        await PremiumModal.alert('Error guardando membresía');
+        await PremiumModal.alert('Error guardando datos');
       }
     } catch (err) {
       console.error(err);
@@ -211,10 +215,15 @@ function renderAdminManageTable(filter = '') {
 }
 
 window.editUserMembership = function(userId, plan, expires) {
+  const user = adminUsers.find(u => u.id === userId) || {};
   document.getElementById('adminEditUserId').value = userId;
+  document.getElementById('adminEditName').value = user.name || '';
+  document.getElementById('adminEditGrade').value = user.grade || '';
+  document.getElementById('adminEditArea').value = user.area || '';
+  document.getElementById('adminEditSchool').value = user.school || '';
   document.getElementById('adminEditPlan').value = plan;
   document.getElementById('adminEditExpires').value = expires ? expires.split('T')[0] : '';
-  document.getElementById('adminEditResetCount').checked = true;
+  document.getElementById('adminEditResetCount').checked = false;
   document.getElementById('adminEditModal').style.display = 'flex';
 }
 

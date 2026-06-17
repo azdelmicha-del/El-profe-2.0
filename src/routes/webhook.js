@@ -307,7 +307,39 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                         }
                     }
                 }
-                
+
+                // --- RECUPERACIÓN DE FORMATO PENDIENTE ---
+                // Si el clasificador dijo NINGUNO pero la conversación ya tiene un pendingFormatId
+                // de un turno anterior (ej: profesor dice "sí" para confirmar), reinjectamos
+                // las instrucciones para que la IA sepa que debe generar el [GENERATE_WORD].
+                if (!hasFormat && activeConv && activeConv.pendingFormatId) {
+                    try {
+                        const pendingFmt = await getDb().collection('doc_formats').findOne(
+                            { _id: new (require('mongoose').Types.ObjectId)(activeConv.pendingFormatId) }
+                        );
+                        if (pendingFmt) {
+                            hasFormat = true;
+                            let recoverIns = `\n\nREGLA DE DOCUMENTO WORD PENDIENTE (CRÍTICO):
+El profesor ya acordó crear un documento usando una plantilla Word. El sistema está listo para generarlo.
+
+Si en el mensaje actual el profesor confirma (dice palabras como: "sí", "sí quiero", "genéralo", "ok", "dale", "hazlo", "envíamelo", etc.), DEBES responder EXACTAMENTE así y NADA MÁS:
+[GENERATE_WORD]
+\`\`\`json
+{
+  "campo1": "valor que debes rellenar con los datos recopilados",
+  "campo2": "valor rellenado"
+}
+\`\`\`
+
+Si el profesor NO confirma aún (pregunta algo, pide cambios, da más datos), continúa conversando y recolectando la información faltante, terminando con: "¿Todo listo, quieres que genere tu documento Word ahora?"`;
+                            if (pendingFmt.instructions) recoverIns += `\n\nINSTRUCCIONES DEL ADMIN PARA LAS CLAVES JSON: ${pendingFmt.instructions}`;
+                            MINERD_SYSTEM_PROMPT += recoverIns;
+                        }
+                    } catch(e) {
+                        console.error('[RECOVER FORMAT] Error:', e.message);
+                    }
+                }
+
                 // Se eliminó la regla estricta de disponibilidad para permitir que el Prompt Principal converse libremente.
             } catch (err) {
                 console.error("Error en AI Router", err);
