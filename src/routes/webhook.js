@@ -394,7 +394,12 @@ async function processWord(buffer) {
             } catch (e) {}
 
             // -- PASO SUPERVISOR IA --
-            reply = await callSupervisor(user._id.toString(), systemWithRefs, text, reply);
+            if (reply) reply = await callSupervisor(user._id.toString(), systemWithRefs, text, reply);
+
+            // SANITIZE LEAKED PROMPT DIRECTIVES
+            if (reply) {
+                reply = reply.replace(/\[?SOLICITAR_AL_PROMPT_PRINCIPAL\]?:?\s*/gi, '');
+            }
 
             const memMatch = reply.match(/\[MEMORIA:\s*(.+?)\]/i);
             if (memMatch) {

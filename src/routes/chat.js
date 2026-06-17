@@ -247,6 +247,8 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
         if (!text) text = await tryGemini();
         
         if (text) {
+            text = text.replace(/\[?SOLICITAR_AL_PROMPT_PRINCIPAL\]?:?\s*/gi, '');
+
             const memMatch = text.match(/\[MEMORIA:\s*(.+?)\]/i);
             if (memMatch) {
                 const newPref = memMatch[1].trim();
