@@ -286,9 +286,7 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                     }
                 }
                 
-                if (!hasFormat) {
-                    MINERD_SYSTEM_PROMPT += `\n\nREGLA ESTRICTA DE DISPONIBILIDAD:\nSi notas que el usuario te está pidiendo explícitamente que le generes o crees una planificación, examen, rúbrica o cualquier documento estructurado, DEBES OBLIGATORIAMENTE rechazar la creación del mismo con este texto exacto:\n"Aún no tengo el recurso o diseño activo para esa solicitud. Sin embargo, puedo pasarte con servicio al cliente para poder ayudarte desde el sistema."\n(Nota: Si solo está haciendo una pregunta conversacional, charlando, o pidiendo consejos/ideas sueltas, respóndele normalmente. Esta prohibición es SOLO para generar documentos formales o planificaciones estructuradas).`;
-                }
+                // Se eliminó la regla estricta de disponibilidad para permitir que el Prompt Principal converse libremente.
             } catch (err) {
                 console.error("Error en AI Router", err);
             }
