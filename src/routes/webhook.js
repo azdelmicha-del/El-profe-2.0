@@ -516,8 +516,71 @@ Si no encuentras NADA, responde: {}`;
                 if (t) reply = t;
             }
 
-            // -- PASO SUPERVISOR IA --
-            if (reply) reply = await callSupervisor(user._id.toString(), systemWithRefs, text, reply);
+            // ═══════════════════════════════════════════════════════════════
+            // GENERACIÓN FORZADA: La IA tenía instrucciones de formato pero
+            // NO incluyó [GENERATE_WORD]. Se hace una 2da llamada forzada
+            // que extrae las etiquetas reales de la plantilla y genera el JSON.
+            // ═══════════════════════════════════════════════════════════════
+            const pendingFmtId = (activeConv && activeConv.pendingFormatId) || req.pendingFormatId;
+            if (hasFormat && pendingFmtId && !reply.includes('[GENERATE_WORD]')) {
+                try {
+                    const fmtDoc2 = await getDb().collection('doc_formats').findOne(
+                        { _id: new mongoose.Types.ObjectId(pendingFmtId) }
+                    );
+                    if (fmtDoc2 && fmtDoc2.filePath) {
+                        const tPath2 = path.join(PROJECT_ROOT, 'public', fmtDoc2.filePath);
+                        let templateKeys = [];
+                        try {
+                            const tContent2 = fs.readFileSync(tPath2, 'binary');
+                            const tZip2 = new PizZip(tContent2);
+                            const rawXml2 = tZip2.files['word/document.xml'] ? tZip2.files['word/document.xml'].asText() : '';
+                            const tagMatches2 = rawXml2.match(/\{\{([^}]+)\}\}/g) || [];
+                            templateKeys = [...new Set(tagMatches2.map(t => t.replace(/[{}]/g, '').trim()))];
+                            console.log('[FORCED GEN] Etiquetas plantilla:', templateKeys);
+                        } catch(tagErr) {
+                            console.log('[FORCED GEN] No se extrajeron tags del Word, se usaran keys genericas');
+                        }
+
+                        const convoContext = historyMessages
+                            .map(m => (m.role === 'user' ? 'Profesor' : 'Asistente') + ': ' + m.content)
+                            .join('\n') + '\nProfesor: ' + text;
+
+                        const keysInfo = templateKeys.length > 0
+                            ? 'Las etiquetas EXACTAS del documento son: ' + templateKeys.map(k => '{{' + k + '}}').join(', ') + '. Usa EXACTAMENTE esas claves en el JSON.'
+                            : 'Usa claves como: nombre_profesor, grado, area, tema, fecha, objetivo, actividades, recursos, evaluacion.';
+
+                        const forcedPrompt = 'Eres un generador de documentos. Usa la conversacion para rellenar la plantilla Word.\n\n'
+                            + keysInfo + '\n\nDatos del profesor:\n'
+                            + 'Nombre: ' + (user.name || 'No especificado') + '\n'
+                            + 'Grado: ' + (user.grade || 'No especificado') + '\n'
+                            + 'Area: ' + (user.area || 'No especificada') + '\n'
+                            + 'Centro: ' + (user.school || 'No especificado') + '\n\n'
+                            + 'Conversacion:\n' + convoContext + '\n\n'
+                            + 'Responde SOLO con [GENERATE_WORD] seguido del JSON. Sin texto adicional.\n'
+                            + '[GENERATE_WORD]\n```json\n{ "clave": "valor" }\n```';
+
+                        const fr2 = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                            body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 2000, temperature: 0.2, messages: [{ role: 'user', content: forcedPrompt }] })
+                        });
+                        if (fr2.ok) {
+                            const fd2 = await fr2.json();
+                            if (fd2.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Generacion Forzada Word', 'gpt-4o-mini', fd2.usage);
+                            const forcedReply = fd2?.choices?.[0]?.message?.content?.trim();
+                            if (forcedReply && forcedReply.includes('[GENERATE_WORD]')) {
+                                reply = forcedReply;
+                                console.log('[FORCED GEN] Exito: [GENERATE_WORD] generado forzadamente');
+                            }
+                        }
+                    }
+                } catch(forceErr) {
+                    console.error('[FORCED GEN] Error:', forceErr.message);
+                }
+            }
+
+            // -- PASO SUPERVISOR IA (omitir si hay GENERATE_WORD) --
+            if (reply && !reply.includes('[GENERATE_WORD]')) reply = await callSupervisor(user._id.toString(), systemWithRefs, text, reply);
 
 
             // SANITIZE LEAKED PROMPT DIRECTIVES
@@ -588,7 +651,7 @@ Si no encuentras NADA, responde: {}`;
 
             await getDb().collection('client_messages').insertOne({ phone: from, message: reply, direction: 'outgoing', employeeId: null, employeeName: 'Bot WhatsApp', createdAt: new Date() });
 
-            // --- 2. ENTREGA DE PDFS / WORDS POR WHATSAPP ---
+            // --- 2. ENTREGA DE WORDS POR WHATSAPP ---
             if (reply.includes('[GENERATE_WORD]')) {
                 try {
                     let jsonData = {};
@@ -597,39 +660,85 @@ Si no encuentras NADA, responde: {}`;
                         jsonData = JSON.parse(jsonMatch[1]);
                     }
 
-                    if (activeConv && activeConv.pendingFormatId) {
-                        const formatDoc = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(activeConv.pendingFormatId) });
+                    const fmtId = (activeConv && activeConv.pendingFormatId) || req.pendingFormatId;
+                    if (fmtId) {
+                        const formatDoc = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(fmtId) });
                         if (formatDoc && formatDoc.filePath) {
                             const templatePath = path.join(PROJECT_ROOT, 'public', formatDoc.filePath);
                             const outDir = path.join(PROJECT_ROOT, 'public', 'downloads');
                             if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-                            
+
                             const outFilename = `Documento-${from}-${Date.now()}.docx`;
                             const outPath = path.join(outDir, outFilename);
                             const outUrl = `https://planixa.onrender.com/public/downloads/${outFilename}`;
-                            
+
                             const content = fs.readFileSync(templatePath, 'binary');
                             const zip = new PizZip(content);
-                            const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-                            
+
+                            // Extraer etiquetas {{campo}} reales del XML del Word
+                            let realKeys = [];
+                            try {
+                                const rawXml = zip.files['word/document.xml'] ? zip.files['word/document.xml'].asText() : '';
+                                const tagMatches = rawXml.match(/\{\{([^}]+)\}\}/g) || [];
+                                realKeys = [...new Set(tagMatches.map(t => t.replace(/[{}]/g, '').trim()))];
+                                console.log('[WORD GEN] Etiquetas en plantilla:', realKeys);
+                            } catch(xe) { console.error('[WORD GEN] Error extrayendo tags:', xe.message); }
+
+                            // Mapeo inteligente: asignar claves faltantes desde el JSON o el perfil
+                            if (realKeys.length > 0) {
+                                const finalData = {};
+                                for (const rk of realKeys) {
+                                    const rkLow = rk.toLowerCase().replace(/[_\s]/g, '');
+                                    // Buscar coincidencia en el JSON recibido
+                                    let matched = null;
+                                    for (const [jk, jv] of Object.entries(jsonData)) {
+                                        const jkLow = jk.toLowerCase().replace(/[_\s]/g, '');
+                                        if (rk === jk || rkLow === jkLow || rkLow.includes(jkLow) || jkLow.includes(rkLow)) {
+                                            matched = jv; break;
+                                        }
+                                    }
+                                    if (matched !== null) { finalData[rk] = matched; continue; }
+                                    // Fallback desde perfil del profesor
+                                    if (rkLow.includes('profesor') || rkLow.includes('docente') || (rkLow.includes('nombre') && !rkLow.includes('tema'))) finalData[rk] = user.name || '';
+                                    else if (rkLow.includes('grado') || rkLow.includes('nivel')) finalData[rk] = user.grade || jsonData.grado || '';
+                                    else if (rkLow.includes('area') || rkLow.includes('materia') || rkLow.includes('asignatura')) finalData[rk] = user.area || jsonData.area || '';
+                                    else if (rkLow.includes('escuela') || rkLow.includes('centro') || rkLow.includes('colegio')) finalData[rk] = user.school || '';
+                                    else if (rkLow.includes('fecha')) finalData[rk] = new Date().toLocaleDateString('es-DO');
+                                    else finalData[rk] = ''; // dejar vacío en vez de crashear
+                                }
+                                jsonData = finalData;
+                                console.log('[WORD GEN] JSON final para plantilla:', Object.keys(jsonData));
+                            }
+
+                            // nullGetter evita que claves faltantes tiren error
+                            const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => '' });
                             doc.render(jsonData);
-                            
+
                             const buf = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
                             fs.writeFileSync(outPath, buf);
 
-                            await sendWhatsAppMessage(from, "Aquí tienes tu documento estructurado en Word, profe 📄✨");
+                            await sendWhatsAppMessage(from, '¡Aquí tienes tu documento Word, profe! 📄✨');
                             await sendWhatsAppDocument(from, outUrl, outFilename);
+
+                            // Limpiar pendingFormatId
+                            if (activeConv) {
+                                await getDb().collection('conversations').updateOne(
+                                    { _id: activeConv._id },
+                                    { $unset: { pendingFormatId: '' } }
+                                );
+                            }
                         } else {
-                            await sendWhatsAppMessage(from, "Hubo un error localizando la plantilla original.");
+                            await sendWhatsAppMessage(from, 'Hubo un error localizando la plantilla original.');
                         }
                     } else {
-                        await sendWhatsAppMessage(from, "Hubo un problema encontrando el formato.");
+                        await sendWhatsAppMessage(from, 'Hubo un problema encontrando el formato.');
                     }
                 } catch(e) {
-                    console.error("Error generating word: ", e);
-                    await sendWhatsAppMessage(from, "Ocurrió un error rellenando el documento Word.");
+                    console.error('Error generating word: ', e);
+                    await sendWhatsAppMessage(from, 'Ocurrió un error generando el documento. Por favor intenta de nuevo.');
                 }
             }
+
             else if (reply.includes('[GENERATE_PDF]')) {
                 // Generar PDF legacy (Planificaciones regulares)
                 const pdfDir = path.join(PROJECT_ROOT, 'public', 'downloads');
