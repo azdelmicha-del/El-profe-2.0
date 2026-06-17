@@ -279,7 +279,11 @@ Debes responder EXACTAMENTE con este formato:
 Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el contexto.`;
                                 MINERD_SYSTEM_PROMPT += tmplIns;
                                 // Inyectar el ID del formato en el system message temporalmente para saber cuál usar
-                                activeConv.pendingFormatId = matchedFormat._id.toString();
+                                if (activeConv) {
+                                    activeConv.pendingFormatId = matchedFormat._id.toString();
+                                } else {
+                                    req.pendingFormatId = matchedFormat._id.toString();
+                                }
                             }
                         }
                     }
@@ -411,21 +415,27 @@ async function processWord(buffer) {
             ];
 
             if (activeConv) {
+                let updateData = { $push: { messages: { $each: newMessages } } };
+                if (activeConv.pendingFormatId) updateData.$set = { pendingFormatId: activeConv.pendingFormatId };
+                
                 await getDb().collection('conversations').updateOne(
                     { _id: activeConv._id },
-                    { $push: { messages: { $each: newMessages } } }
+                    updateData
                 );
                 if (!activeConv.messages) activeConv.messages = [];
                 activeConv.messages.push(...newMessages);
             } else {
-                const insertResult = await getDb().collection('conversations').insertOne({
+                let insertData = {
                     userId,
                     is_whatsapp: true,
                     title: 'WhatsApp: ' + now.toLocaleDateString('es-DO'),
                     messages: newMessages,
                     createdAt: now,
                     pdfGenerated: false
-                });
+                };
+                if (req.pendingFormatId) insertData.pendingFormatId = req.pendingFormatId;
+                
+                const insertResult = await getDb().collection('conversations').insertOne(insertData);
                 activeConv = await getDb().collection('conversations').findOne({ _id: insertResult.insertedId });
             }
 

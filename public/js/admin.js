@@ -355,9 +355,9 @@ function renderAdminFormats(items = adminFormats) {
     card.style.borderRadius = '8px';
     card.style.cursor = 'pointer';
     card.innerHTML = `
-      <div style="flex:1;">
-        <h4 style="margin:0 0 5px 0;">${f.type}</h4>
-        <p style="font-size:12px; color:var(--text-light); margin:0;">${f.fileName || 'Plantilla.docx'}</p>
+      <div style="flex:1; overflow:hidden;">
+        <h4 style="margin:0 0 5px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${f.type}">${f.type}</h4>
+        <p style="font-size:12px; color:var(--text-light); margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${f.fileName || 'Plantilla.docx'}">${f.fileName || 'Plantilla.docx'}</p>
       </div>
       <div style="display:flex; gap:8px; margin-top:10px;">
         <button onclick="event.stopPropagation(); openFormatModal(${JSON.stringify(f).replace(/"/g, '&quot;')})" style="background:rgba(255,255,255,0.1); color:var(--text); border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; flex:1;">Editar</button>

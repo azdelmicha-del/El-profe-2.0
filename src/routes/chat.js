@@ -19,7 +19,10 @@ module.exports = function (app) {
         let history = [];
         if (conversationId) {
             const conv = await getDb().collection('conversations').findOne({ _id: new (require('mongoose').Types.ObjectId)(conversationId), userId });
-            if (conv) history = conv.messages || [];
+            if (conv) {
+                history = conv.messages || [];
+                if (conv.pendingFormatId) req.pendingFormatId = conv.pendingFormatId;
+            }
         }
 
         const userDoc = await getDb().collection('users').findOne({ _id: new (require('mongoose').Types.ObjectId)(userId) });
@@ -141,6 +144,13 @@ Debes responder EXACTAMENTE con este formato:
 Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el contexto.`;
                             MINERD_SYSTEM_PROMPT += tmplIns;
                             req.pendingFormatId = matchedFormat._id.toString();
+                            
+                            if (conversationId) {
+                                await getDb().collection('conversations').updateOne(
+                                    { _id: new mongoose.Types.ObjectId(conversationId) },
+                                    { $set: { pendingFormatId: req.pendingFormatId } }
+                                );
+                            }
                         }
                     }
                 }
