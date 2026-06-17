@@ -58,7 +58,7 @@ module.exports = function (app) {
 
         let routerPromise = null;
         if (prompts.length > 1) {
-            const routerPrompt = `Eres un enrutador inteligente. Tienes los siguientes Especialistas (Prompts) disponibles:\n${prompts.map(p => `- ID: ${p._id.toString()} | Nombre: ${p.name} | Cuándo usar: ${p.description}`).join('\n')}\n\nEl usuario ha dicho: "${text}"\n\nResponde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta solicitud. Si ninguno aplica claramente, responde con el ID del Especialista más general o principal.`;
+            const routerPrompt = `Eres un enrutador inteligente. Tienes los siguientes Especialistas (Prompts) disponibles:\n${prompts.map(p => `- ID: ${p._id.toString()} | Nombre: ${p.name} | Cuándo usar: ${p.description}`).join('\n')}\n\nEl usuario ha dicho: "${message}"\n\nResponde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta solicitud. Si ninguno aplica claramente, responde con el ID del Especialista más general o principal.`;
             
             routerPromise = fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
@@ -74,7 +74,7 @@ module.exports = function (app) {
 
         let formatPromise = null;
         if (formats.length > 0) {
-            const formatMatcherPrompt = `Eres un clasificador. Revisa si el mensaje del usuario está pidiendo generar un documento. Formatos disponibles: ${formats.map(f => f.type).join(', ')}. Si pide uno de esos, responde EXACTAMENTE con el tipo. Si no, responde "NINGUNO".\nMensaje: "${text}"`;
+            const formatMatcherPrompt = `Eres un clasificador. Revisa si el mensaje del usuario está pidiendo generar un documento. Formatos disponibles: ${formats.map(f => f.type).join(', ')}. Si pide uno de esos, responde EXACTAMENTE con el tipo. Si no, responde "NINGUNO".\nMensaje: "${message}"`;
             
             formatPromise = fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
@@ -107,7 +107,6 @@ module.exports = function (app) {
 
         // Inject Profile
         MINERD_SYSTEM_PROMPT += profileBlock;
-        MINERD_SYSTEM_PROMPT += identityRule;
 
         if (fRes && fRes.ok) {
             const fData = await fRes.json();
@@ -170,7 +169,7 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
             console.error("Error fetching knowledge base", err);
         }
 
-        const systemWithRefs = MINERD_SYSTEM_PROMPT + profileBlock + identityRule + referencesBlock + globalKnowledgeBlock;
+        const systemWithRefs = MINERD_SYSTEM_PROMPT + referencesBlock + globalKnowledgeBlock;
 
         const messages = [
             { role: 'system', content: systemWithRefs },

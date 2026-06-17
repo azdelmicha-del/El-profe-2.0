@@ -54,7 +54,7 @@ module.exports = function (app) {
             console.log("Admin requested /api/admin/users. User ID:", req.userId);
             const users = await getDb().collection('users').find({}, { projection: { password: 0 } }).sort({ created_at: -1 }).toArray();
             console.log("Found users for admin:", users.length);
-            res.json({ users: users.map(u => ({ id: u._id.toString(), phone: u.phone, name: u.name || '', role: u.role, is_admin: !!u.is_admin, plan: u.plan || 'free', plan_expires: u.plan_expires, plans_count: u.plans_count || 0, created_at: u.created_at })) });
+            res.json({ users: users.map(u => ({ id: u._id.toString(), phone: u.phone, name: u.name || '', grade: u.grade || '', area: u.area || '', school: u.school || '', role: u.role, is_admin: !!u.is_admin, plan: u.plan || 'free', plan_expires: u.plan_expires, plans_count: u.plans_count || 0, created_at: u.created_at })) });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 

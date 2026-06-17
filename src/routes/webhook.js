@@ -94,6 +94,8 @@ module.exports = function (app) {
                 userId = result.insertedId.toString();
                 user = await getDb().collection('users').findOne({ _id: new mongoose.Types.ObjectId(userId) });
                 const welcomeReply = '¡Hola, profe! 🤖 \n\nA partir de hoy voy a ser tu **Planixa Asistente**.\n\nPuedo ayudarte a crear unidades, secuencias, planificaciones diarias, rúbricas, evaluaciones y mucho más.\n\nAntes de empezar, cuéntame:\n📌 ¿Cuál es tu nombre?\n📌 ¿Qué grado y área trabajas normalmente?';
+                // Guardar respuesta de bienvenida en el historial del admin
+                await getDb().collection('client_messages').insertOne({ phone: from, message: welcomeReply, direction: 'outgoing', employeeId: null, employeeName: 'Bot WhatsApp', createdAt: new Date() });
                 await sendWhatsAppButtons(from, welcomeReply, ['¡Hola! 👋', 'Ver mis planes 📂']);
                 return;
             }
@@ -152,6 +154,20 @@ module.exports = function (app) {
                 }
 
                 const confirmReply = '¡Excelente profe! Ya he guardado tus datos.\n\n¿Quieres comenzar con una planificación diaria? ¿O prefieres una Unidad o Secuencia?';
+                // Guardar el intercambio de recoleccion de nombre en historial y conversación
+                await getDb().collection('client_messages').insertOne({ phone: from, message: confirmReply, direction: 'outgoing', employeeId: null, employeeName: 'Bot WhatsApp', createdAt: new Date() });
+                const now = new Date();
+                await getDb().collection('conversations').insertOne({
+                    userId,
+                    is_whatsapp: true,
+                    title: 'WhatsApp: ' + now.toLocaleDateString('es-DO'),
+                    messages: [
+                        { role: 'user', content: text, timestamp: now },
+                        { role: 'assistant', content: confirmReply, timestamp: new Date() }
+                    ],
+                    createdAt: now,
+                    pdfGenerated: false
+                });
                 await sendWhatsAppMessage(from, confirmReply);
                 return;
             }
@@ -277,10 +293,16 @@ Debes responder EXACTAMENTE con este formato, SIN agregar toda la planificación
 \`\`\`
 Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el contexto.`;
                             MINERD_SYSTEM_PROMPT += tmplIns;
+                            const newPendingFormatId = matchedFormat._id.toString();
                             if (activeConv) {
-                                activeConv.pendingFormatId = matchedFormat._id.toString();
+                                activeConv.pendingFormatId = newPendingFormatId;
+                                // Persistir en DB inmediatamente para que sobreviva a la próxima vuelta del webhook
+                                await getDb().collection('conversations').updateOne(
+                                    { _id: activeConv._id },
+                                    { $set: { pendingFormatId: newPendingFormatId } }
+                                );
                             } else {
-                                req.pendingFormatId = matchedFormat._id.toString();
+                                req.pendingFormatId = newPendingFormatId;
                             }
                         }
                     }
@@ -373,23 +395,88 @@ async function processWord(buffer) {
                 { role: 'user', content: text }
             ];
 
+            // ══════════════════════════════════════════════════════════
+            // VIGILANTE DE PERFIL (corre en paralelo, no bloquea)
+            // Extrae datos del profesor de cada mensaje y actualiza
+            // los campos que aún estén vacíos en su perfil.
+            // ══════════════════════════════════════════════════════════
+            const profileWatcher = async () => {
+                try {
+                    // Solo actuar si hay campos vacíos que rellenar
+                    const missingFields = [];
+                    if (!user.name || user.name.trim() === '') missingFields.push('name');
+                    if (!user.grade || user.grade.trim() === '') missingFields.push('grade');
+                    if (!user.area || user.area.trim() === '') missingFields.push('area');
+                    if (!user.school || user.school.trim() === '') missingFields.push('school');
+                    if (missingFields.length === 0) return; // perfil completo, nada que hacer
+
+                    const watcherPrompt = `Eres un extractor de datos silencioso. Analiza el texto de un profesor dominicano y extrae únicamente los datos solicitados si están presentes.
+
+CAMPOS A BUSCAR: ${missingFields.join(', ')}
+- name: Nombre completo del profesor (IGNORA palabras genéricas como: hola, ok, sí, no, bien, gracias, claro, listo, bueno, hey, buenas)
+- grade: Grado que enseña (ej: "3ro Primaria", "1ro Secundaria", "Kinder")
+- area: Materia o área (ej: "Matemáticas", "Lengua Española", "Ciencias")
+- school: Nombre del centro educativo
+
+Texto del profesor: "${text}"
+
+Responde ÚNICAMENTE con un JSON. Incluye solo los campos que puedas confirmar claramente. Si no encuentras un dato, NO lo incluyas en el JSON. Ejemplo: {"name": "María López", "grade": "4to Primaria"}
+Si no encuentras NADA, responde: {}`;
+
+                    const wr = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                        body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: watcherPrompt }], max_tokens: 100, temperature: 0 })
+                    });
+
+                    if (!wr.ok) return;
+                    const wd = await wr.json();
+                    const raw = wd?.choices?.[0]?.message?.content?.trim();
+                    if (!raw || raw === '{}') return;
+
+                    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
+                    if (!jsonMatch) return;
+
+                    const extracted = JSON.parse(jsonMatch[0]);
+                    const updates = {};
+
+                    // Solo actualizar campos que estaban vacíos y ahora tienen valor
+                    if (missingFields.includes('name') && extracted.name && extracted.name.length > 2) updates.name = extracted.name;
+                    if (missingFields.includes('grade') && extracted.grade) updates.grade = extracted.grade;
+                    if (missingFields.includes('area') && extracted.area) updates.area = extracted.area;
+                    if (missingFields.includes('school') && extracted.school) updates.school = extracted.school;
+
+                    if (Object.keys(updates).length > 0) {
+                        await getDb().collection('users').updateOne({ _id: user._id }, { $set: updates });
+                        console.log(`[VIGILANTE PERFIL] Actualizado perfil de ${from}:`, updates);
+                    }
+                } catch (e) {
+                    console.error('[VIGILANTE PERFIL] Error silencioso:', e.message);
+                }
+            };
+
             let reply = '⚠️ No pude procesar tu solicitud. Intenta de nuevo.';
-            try {
-                const r = await fetch('https://api.openai.com/v1/chat/completions', {
+            
+            // Lanzar vigilante y llamada IA en PARALELO
+            const [, aiResponse] = await Promise.all([
+                profileWatcher(),
+                fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
                     body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 3000, temperature: 0.3, messages })
-                });
-                if (r.ok) {
-                    const d = await r.json();
-                    if (d.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Mensaje Principal', 'gpt-4o-mini', d.usage);
-                    const t = d?.choices?.[0]?.message?.content?.trim();
-                    if (t) reply = t;
-                }
-            } catch (e) {}
+                }).catch(e => { console.error('AI main error', e); return null; })
+            ]);
+
+            if (aiResponse && aiResponse.ok) {
+                const d = await aiResponse.json();
+                if (d.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Mensaje Principal', 'gpt-4o-mini', d.usage);
+                const t = d?.choices?.[0]?.message?.content?.trim();
+                if (t) reply = t;
+            }
 
             // -- PASO SUPERVISOR IA --
             if (reply) reply = await callSupervisor(user._id.toString(), systemWithRefs, text, reply);
+
 
             // SANITIZE LEAKED PROMPT DIRECTIVES
             if (reply) {

@@ -481,41 +481,119 @@ window.deleteAdminUser = async function(id) {
 
 async function loadAdminUserChat(userId) {
   const view = document.getElementById('adminChatView');
-  view.innerHTML = '<div style="text-align:center; margin-top:20px;">Cargando chat...</div>';
+  view.style.display = 'flex';
+  view.style.flexDirection = 'column';
+  view.innerHTML = '<div style="text-align:center; margin-top:20px; color:var(--text-light);">Cargando conversación...</div>';
   try {
     const res = await fetch('/api/admin/users/' + userId + '/chat', {
       headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') }
     });
     const data = await res.json();
     view.innerHTML = '';
-    
+
+    // --- Tarjeta de perfil del cliente ---
+    const user = adminUsers.find(u => u.id === userId) || {};
+    const planColors = { trial: '#f59e0b', '1_week': '#38bdf8', '1_month': '#10b981', '3_months': '#8b5cf6', '6_months': '#ec4899', '1_year': '#f97316', lifetime: '#22c55e' };
+    const planColor = planColors[user.plan] || '#6b7280';
+    const expiresStr = user.plan_expires ? new Date(user.plan_expires).toLocaleDateString('es-DO') : 'N/A';
+
+    const profileCard = document.createElement('div');
+    profileCard.style.cssText = 'background:var(--card); border:1px solid var(--border); border-radius:12px; padding:15px; margin-bottom:12px; flex-shrink:0;';
+    profileCard.innerHTML = `
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div style="width:42px; height:42px; border-radius:50%; background:var(--primary); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">👤</div>
+        <div style="flex:1; min-width:150px;">
+          <div style="font-weight:bold; font-size:15px;">${user.name || 'Sin nombre'}</div>
+          <div style="font-size:12px; color:var(--text-light);">📱 ${user.phone || '-'}</div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; font-size:12px;">
+          <span style="background:${planColor}22; color:${planColor}; border:1px solid ${planColor}55; border-radius:6px; padding:3px 10px; font-weight:600;">📋 ${user.plan || 'trial'}</span>
+          <span style="background:var(--bg-hover); border-radius:6px; padding:3px 10px;">🗓️ Vence: ${expiresStr}</span>
+          <span style="background:var(--bg-hover); border-radius:6px; padding:3px 10px;">📄 ${user.plans_count || 0} planificaciones</span>
+        </div>
+      </div>
+      <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border); display:flex; gap:15px; flex-wrap:wrap; font-size:12px; color:var(--text-light);">
+        <span>🎓 Grado: <strong style="color:var(--text);">${user.grade || 'No registrado'}</strong></span>
+        <span>📚 Área: <strong style="color:var(--text);">${user.area || 'No registrada'}</strong></span>
+        <span>🏫 Centro: <strong style="color:var(--text);">${user.school || 'No registrado'}</strong></span>
+      </div>
+    `;
+    view.appendChild(profileCard);
+
+    // --- Combinar y ordenar mensajes ---
+    let allMessages = [];
+
+    // Mensajes de WhatsApp (client_messages)
     if (data.messages && data.messages.length > 0) {
       data.messages.forEach(m => {
-        const div = document.createElement('div');
-        div.style.padding = '10px';
-        div.style.borderRadius = '8px';
-        div.style.maxWidth = '80%';
-        div.style.marginBottom = '5px';
-        div.style.fontSize = '13px';
-        div.style.wordBreak = 'break-word';
-        if (m.role === 'user' || m.direction === 'incoming') {
-          div.style.background = 'var(--primary)';
-          div.style.color = '#fff';
-          div.style.alignSelf = 'flex-end';
-          div.style.marginLeft = 'auto';
-        } else {
-          div.style.background = 'var(--card)';
-          div.style.color = 'var(--text)';
-          div.style.border = '1px solid var(--border)';
-        }
-        div.innerText = m.content || m.message || '';
-        view.appendChild(div);
+        allMessages.push({
+          text: m.message || '',
+          isUser: m.direction === 'incoming',
+          timestamp: new Date(m.createdAt || 0),
+          source: 'whatsapp'
+        });
       });
-    } else {
-      view.innerHTML = '<div style="text-align:center; margin-top:20px; color:var(--text-light);">No hay mensajes con este cliente.</div>';
     }
+
+    // Conversaciones web (si no hay mensajes WA o para complementar)
+    if (data.conversations && data.conversations.length > 0) {
+      data.conversations.forEach(conv => {
+        (conv.messages || []).forEach(m => {
+          if (m.role === 'system') return;
+          allMessages.push({
+            text: m.content || '',
+            isUser: m.role === 'user',
+            timestamp: new Date(m.timestamp || conv.createdAt || 0),
+            source: 'web'
+          });
+        });
+      });
+    }
+
+    // Ordenar cronológicamente
+    allMessages.sort((a, b) => a.timestamp - b.timestamp);
+
+    if (allMessages.length === 0) {
+      view.innerHTML += '<div style="text-align:center; margin-top:40px; color:var(--text-light);">No hay conversaciones con este cliente aún.</div>';
+      return;
+    }
+
+    // Contenedor de mensajes con scroll
+    const messagesContainer = document.createElement('div');
+    messagesContainer.style.cssText = 'flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding-bottom:10px;';
+
+    allMessages.forEach(m => {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = `display:flex; justify-content:${m.isUser ? 'flex-end' : 'flex-start'};`;
+
+      const bubble = document.createElement('div');
+      bubble.style.cssText = `
+        max-width:75%; padding:10px 14px; border-radius:${m.isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px'};
+        font-size:13px; line-height:1.5; word-break:break-word;
+        background:${m.isUser ? 'var(--primary)' : 'var(--card)'};
+        color:${m.isUser ? '#fff' : 'var(--text)'};
+        border:${m.isUser ? 'none' : '1px solid var(--border)'};
+      `;
+
+      const timeStr = m.timestamp.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
+      const dateStr = m.timestamp.toLocaleDateString('es-DO', { day: '2-digit', month: 'short' });
+      const sourceIcon = m.source === 'whatsapp' ? '📱' : '💻';
+
+      bubble.innerHTML = `
+        <div>${m.text.replace(/\n/g, '<br>')}</div>
+        <div style="font-size:10px; opacity:0.6; margin-top:4px; text-align:right;">${sourceIcon} ${dateStr} ${timeStr}</div>
+      `;
+
+      wrap.appendChild(bubble);
+      messagesContainer.appendChild(wrap);
+    });
+
+    view.appendChild(messagesContainer);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
   } catch (err) {
-    view.innerHTML = '<div style="text-align:center; margin-top:20px; color:red;">Error cargando el chat.</div>';
+    console.error(err);
+    view.innerHTML = '<div style="text-align:center; margin-top:20px; color:red;">Error cargando la conversación.</div>';
   }
 }
 
