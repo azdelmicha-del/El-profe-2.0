@@ -38,6 +38,15 @@ module.exports = function (app) {
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
+    app.get('/api/admin/db-stats', authenticateToken, async (req, res) => {
+        if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
+        try {
+            const db = getDb();
+            const stats = await db.command({ dbStats: 1 });
+            res.json(stats);
+        } catch (err) { res.status(500).json({ error: err.message }); }
+    });
+
     app.post('/api/admin/settings/supervisor', authenticateToken, async (req, res) => {
         if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
         try {

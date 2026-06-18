@@ -1366,3 +1366,52 @@ window.startSystemMonitor = function() {
     }
   };
 };
+
+// ==========================================
+// MONITOR DE BASE DE DATOS (SUB-TABS)
+// ==========================================
+window.switchMonitorTab = function(tab) {
+  document.getElementById('monitorServerSubView').style.display = tab === 'server' ? 'flex' : 'none';
+  document.getElementById('monitorDbSubView').style.display = tab === 'db' ? 'flex' : 'none';
+  
+  document.getElementById('btnMonitorServer').style.background = tab === 'server' ? 'var(--primary)' : 'transparent';
+  document.getElementById('btnMonitorServer').style.color = tab === 'server' ? 'white' : 'var(--text-light)';
+  
+  document.getElementById('btnMonitorDb').style.background = tab === 'db' ? 'var(--primary)' : 'transparent';
+  document.getElementById('btnMonitorDb').style.color = tab === 'db' ? 'white' : 'var(--text-light)';
+
+  if (tab === 'db') {
+    window.fetchDbStats();
+  }
+};
+
+window.fetchDbStats = async function() {
+  try {
+    const res = await fetch('/api/admin/db-stats', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') }});
+    if (!res.ok) throw new Error('Error cargando stats');
+    const data = await res.json();
+    
+    const formatBytes = (bytes) => {
+        if (!bytes) return '0 B';
+        const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
+    document.getElementById('dbStorageSize').innerText = formatBytes(data.storageSize);
+    document.getElementById('dbDataSize').innerText = formatBytes(data.dataSize);
+    document.getElementById('dbObjects').innerText = (data.objects || 0).toLocaleString();
+    document.getElementById('dbCollections').innerText = (data.collections || 0).toLocaleString();
+    
+    document.getElementById('dbExtraStats').innerHTML = `
+      <li><b>Índices Totales:</b> ${data.indexes || 0}</li>
+      <li><b>Tamaño de Índices:</b> ${formatBytes(data.indexSize || 0)}</li>
+      <li><b>Tamaño Libre Reutilizable:</b> ${formatBytes(data.freeStorageSize || 0)}</li>
+      <li><b>Tamaño Promedio de Objeto:</b> ${formatBytes(data.avgObjSize || 0)}</li>
+    `;
+  } catch(e) {
+    console.error(e);
+    document.getElementById('dbStorageSize').innerText = 'Error';
+    document.getElementById('dbDataSize').innerText = 'Error';
+  }
+};
