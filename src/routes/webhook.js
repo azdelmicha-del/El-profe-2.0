@@ -153,430 +153,158 @@ module.exports = function (app) {
                 const prompts = await getDb().collection('prompts').find({}).toArray();
                 const formats = await getDb().collection('doc_formats').find({}).toArray();
                 
-                // Buscar explícitamente "Planixa Principal" como el por defecto (soporta guiones bajos)
-                defaultPrompt = prompts.find(p => p.name && p.name.replace(/_/g, ' ').trim().toLowerCase() === 'planixa principal') || (prompts.length > 0 ? prompts[0] : null);
+                // Buscar explícitamente "Planixa Asistente" como el por defecto (soporta guiones bajos)
+                defaultPrompt = prompts.find(p => p.name && p.name.replace(/_/g, ' ').trim().toLowerCase() === 'planixa asistente') || (prompts.length > 0 ? prompts[0] : null);
                 selectedPrompt = defaultPrompt;
 
-                let routerPromise = null;
-                if (prompts.length > 1) {
-                    const routerPrompt = `Eres un enrutador inteligente. Tienes los siguientes Especialistas (Prompts) disponibles:\n${prompts.map(p => `- ID: ${p._id.toString()} | Nombre: ${p.name} | Cuándo usar: ${p.description}`).join('\n')}\n\nEl usuario ha dicho: "${text}"\n\nResponde ÚNICAMENTE con el ID del Especialista que mejor puede atender esta solicitud. Si ninguno aplica claramente, responde con el ID del Especialista más general o principal.`;
-                    
-                    routerPromise = fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                        body: JSON.stringify({
-                            model: 'gpt-4o-mini',
-                            messages: [{ role: 'system', content: routerPrompt }],
-                            max_tokens: 50,
-                            temperature: 0
-                        })
-                    });
-                }
-
-                let formatPromise = null;
-                if (formats.length > 0) {
-                    const formatMatcherPrompt = `Eres un clasificador. Revisa si el mensaje del usuario está pidiendo generar un documento. Formatos disponibles: ${formats.map(f => f.type).join(', ')}. Si pide uno de esos, responde EXACTAMENTE con el tipo. Si no, responde "NINGUNO".\nMensaje: "${text}"`;
-                    
-                    formatPromise = fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                        body: JSON.stringify({
-                            model: 'gpt-4o-mini',
-                            messages: [{ role: 'system', content: formatMatcherPrompt }],
-                            max_tokens: 20,
-                            temperature: 0
-                        })
-                    });
-                }
-
-                // Ejecutar ambas llamadas en paralelo
-                const [routerRes, fRes] = await Promise.all([
-                    routerPromise ? routerPromise.catch(e => { console.error("Router error", e); return null; }) : Promise.resolve(null),
-                    formatPromise ? formatPromise.catch(e => { console.error("Format error", e); return null; }) : Promise.resolve(null)
-                ]);
-
-                if (routerRes && routerRes.ok) {
-                    const rData = await routerRes.json();
-                    if (rData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Enrutador IA', 'gpt-4o-mini', rData.usage);
-                    const chosenId = rData.choices?.[0]?.message?.content?.trim();
-                    selectedPrompt = prompts.find(p => p._id.toString() === chosenId) || defaultPrompt;
-                    req.app.emit('system_log', { type: 'ROUTER', color: '#3b82f6', title: 'Especialista Asignado', details: selectedPrompt.name });
-                }
-
-                if (selectedPrompt) {
-                    MINERD_SYSTEM_PROMPT = selectedPrompt.content;
-                }
+                // ══════════════════════════════════════════════════════════
+                // NUEVA ARQUITECTURA: ORQUESTADOR MAESTRO (PLANIXA ASISTENTE)
+                // ══════════════════════════════════════════════════════════
                 
-                // Inject User Profile Info
-                MINERD_SYSTEM_PROMPT += `\n\nDATOS DEL PROFESOR:\nNombre: ${user.name || 'Profe'}\nGrado: ${user.grade || 'No especificado'}\nÁrea/Materia: ${user.area || 'No especificada'}\nCentro Educativo: ${user.school || 'No especificado'}\nUsa estos datos siempre que necesites rellenar información personal del profesor o adaptar la planificación a su grado/materia, a menos que el profesor indique algo distinto para esta solicitud en particular.\n` +
-                (user.preferences ? `\nPREFERENCIAS GUARDADAS DEL PROFESOR:\n${user.preferences}\n(RESPETA ESTAS PREFERENCIAS ABSOLUTAMENTE)\n` : '') +
-                `\nREGLA DE APRENDIZAJE: Si el profesor expresa un gusto, preferencia, o cómo le gustan los formatos a futuro (ej. "no me des rubricas", "me gustan los juegos"), debes incluir AL FINAL de tu respuesta esta etiqueta exacta: [MEMORIA: la preferencia aquí]. Yo la guardaré en la base de datos.`;
+                profileWatcher(); // Ejecutar extracción de perfil de fondo
+
+                const availableSpecialists = prompts.filter(p => p._id.toString() !== defaultPrompt._id.toString());
+                const availableFormats = formats.map(f => f.type).join(', ');
+
+                MINERD_SYSTEM_PROMPT = defaultPrompt.content + `
                 
-                MINERD_SYSTEM_PROMPT += `\n\nREGLA DE PERFIL E IDENTIDAD (MUY IMPORTANTE):\nAntes de enviar o comenzar la creación de CUALQUIER planificación o documento, verifica el "Nombre" en los DATOS DEL PROFESOR. Si el nombre es genérico (ej. "hola", "Profe", "Maestro") o está vacío, DEBES preguntarle cortésmente cuál es su nombre completo antes de generar el documento.\n\nCuando el profesor te diga su nombre, grado, materia o escuela (ej. "soy Juan", "doy 2do", "de naturales"), DEBES incluir AL FINAL de tu respuesta esta etiqueta con los datos en formato JSON para guardarlos:\n[UPDATE_PROFILE: {"name": "Juan Perez", "grade": "2do", "area": "Naturales"}]\nIncluye solo los campos que te haya confirmado. Nunca omitas esta regla.`;
-
-                MINERD_SYSTEM_PROMPT += `\n\nREGLA DE ENTREGA POR WHATSAPP:\nPara que el profesor pueda copiar y pegar la planificación fácilmente, NUNCA mezcles la charla conversacional con el documento de la planificación en el mismo bloque. Usa EXACTAMENTE el separador \`|||\` para dividir los mensajes.
-Ejemplo de cómo DEBES responder:
-¡Excelente profe! Aquí te presento la estructura de la unidad:
-|||
-*Unidad Didáctica: El Cuento*
-Grado: 2do grado
-...
-|||
-¿Te parece bien esta estructura, profe? ¿Quieres hacer algún ajuste?`;
-
-                // --- FORMAT INJECTOR ---
-                if (fRes && fRes.ok) {
-                    const fData = await fRes.json();
-                    if (fData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Clasificador Formato', 'gpt-4o-mini', fData.usage);
-                    const chosenType = fData.choices?.[0]?.message?.content?.trim();
-                    if (chosenType && chosenType !== 'NINGUNO') {
-                        const matchedFormat = formats.find(f => f.type.toLowerCase() === chosenType.toLowerCase());
-                        if (matchedFormat) {
-                            hasFormat = true;
-                            req.app.emit('system_log', { type: 'FORMATO', color: '#8b5cf6', title: 'Formato Word Detectado', details: matchedFormat.type });
-                            const newPendingFormatId = matchedFormat._id.toString();
-                            if (activeConv) {
-                                activeConv.pendingFormatId = newPendingFormatId;
-                                await getDb().collection('conversations').updateOne(
-                                    { _id: activeConv._id },
-                                    { $set: { pendingFormatId: newPendingFormatId } }
-                                );
-                            } else {
-                                req.pendingFormatId = newPendingFormatId;
-                            }
-                            // Las instrucciones de Word van AL INICIO del prompt para tener
-                            // prioridad sobre las instrucciones del prompt del admin
-                            let wordPriority = `INSTRUCCIÓN PRIORITARIA DEL SISTEMA (ANULA CUALQUIER OTRA REGLA DE ENTREGA):
-Hay una plantilla Word configurada para este tipo de documento. DEBES seguir estas reglas SIN EXCEPCIÓN y por encima de cualquier otra instrucción:
-
-1. NUNCA envíes la planificación como texto plano en el chat. NUNCA.
-2. Si tienes todos los datos (grado, área, tema): responde SOLO con este bloque y NADA MÁS:
-[GENERATE_WORD]
-\`\`\`json
-{ "clave": "valor_completo" }
-\`\`\`
-3. Si te falta el tema: haz UNA sola pregunta y en el siguiente mensaje genera el bloque [GENERATE_WORD].
-4. NO preguntes si quieren el documento. Genéralo directamente.
-5. Después del JSON puedes añadir UNA frase corta de confirmación.
-`;
-                            if (matchedFormat.instructions) wordPriority += `\nCLAVES EXACTAS DEL JSON (ÚSALAS TAL CUAL):\n${matchedFormat.instructions}\n`;
-                            // INYECTAR AL INICIO, no al final
-                            MINERD_SYSTEM_PROMPT = wordPriority + '\n\n---\n\n' + MINERD_SYSTEM_PROMPT;
-                        }
-                    }
-                }
-
-                // --- RECUPERACIÓN DE FORMATO PENDIENTE ---
-                // Solo activa si el mensaje es relacionado con documentos o una confirmación.
-                // Si el mensaje es un saludo o pregunta no relacionada, limpia el pendingFormatId.
-                if (!hasFormat && activeConv && activeConv.pendingFormatId) {
-                    const isDocRelated = /planif|plan|unidad|secuencia|documento|word|genera|hazlo|s[íi]|ok|dale|listo|adelante|envía|manda|quiero|necesito|tema|grado|área|area|materia|decimal|entero|fraccion|suma|resta|multiplica|divid/i.test(text);
-                    const isJustGreeting = /^(hola|buenos|buenas|hi|hey|ok[,.]?$|gracias|ok ya|no lo|cancela|olv|no quiero)/i.test(text.trim());
-                    if (isJustGreeting || (!isDocRelated && text.length < 15)) {
-                        // Limpiar el pendingFormatId — el usuario cambió de tema
-                        console.log('[RECOVER FORMAT] Mensaje no relacionado, limpiando pendingFormatId');
-                        await getDb().collection('conversations').updateOne(
-                            { _id: activeConv._id },
-                            { $unset: { pendingFormatId: '' } }
-                        );
-                        activeConv.pendingFormatId = null;
-                    } else {
-                        try {
-                            const pendingFmt = await getDb().collection('doc_formats').findOne(
-                                { _id: new mongoose.Types.ObjectId(activeConv.pendingFormatId) }
-                            );
-                            if (pendingFmt) {
-                                hasFormat = true;
-                                let wordPriority2 = `INSTRUCCIÓN PRIORITARIA DEL SISTEMA (ANULA CUALQUIER OTRA REGLA DE ENTREGA):
-Ya tienes info suficiente. Genera el documento Word AHORA. Responde SOLO con:
-[GENERATE_WORD]
-\`\`\`json
-{ "clave": "valor_completo" }
-\`\`\`
-NUNCA escribas la planificación como texto plano.\n`;
-                                if (pendingFmt.instructions) wordPriority2 += `\nCLAVES EXACTAS DEL JSON:\n${pendingFmt.instructions}\n`;
-                                MINERD_SYSTEM_PROMPT = wordPriority2 + '\n\n---\n\n' + MINERD_SYSTEM_PROMPT;
-                            }
-                        } catch(e) {
-                            console.error('[RECOVER FORMAT] Error:', e.message);
-                        }
-                    }
-                }
-
-                // --- INYECCIÓN DE EMERGENCIA PARA ESPECIALISTAS ---
-                // Si es un especialista pero falló la detección del formato exacto, le inyectamos la regla genérica
-                // para que sepa cómo generar documentos y no invente enlaces de descarga.
-                const isSpecialistWorkCheck = selectedPrompt && defaultPrompt && selectedPrompt._id.toString() !== defaultPrompt._id.toString();
-                if (isSpecialistWorkCheck && !hasFormat) {
-                    let fallbackPriority = `INSTRUCCIÓN PRIORITARIA DEL SISTEMA: Eres un Especialista. Si tienes toda la información requerida y el usuario confirma la generación del documento, DEBES responder SOLO con este bloque y NADA MÁS:
-[GENERATE_WORD]
-\`\`\`json
-{ "tema": "...", "grado": "...", "area": "...", "objetivos": "..." }
-\`\`\`
-NUNCA generes enlaces web de descarga como [Descargar Documento](#). Usa estrictamente la etiqueta [GENERATE_WORD] con el JSON para entregar la planificación.\n`;
-                    MINERD_SYSTEM_PROMPT = fallbackPriority + '\n\n---\n\n' + MINERD_SYSTEM_PROMPT;
-                }
-
-            } catch (err) {
-                console.error('Error en AI Router', err);
-            }
-
-
-// ==========================================
-// MEDIA PROCESSING HELPERS
-// ==========================================
-
-async function downloadWhatsAppMedia(mediaId) {
-    const WA_TOKEN = process.env.WA_TOKEN;
-    if (!WA_TOKEN) throw new Error('No WA_TOKEN found');
-    
-    // 1. Get media URL
-    const res = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
-        headers: { 'Authorization': `Bearer ${WA_TOKEN}` }
-    });
-    if (!res.ok) throw new Error('Failed to get media URL');
-    const data = await res.json();
-    
-    // 2. Download binary data
-    const mediaRes = await fetch(data.url, {
-        headers: { 'Authorization': `Bearer ${WA_TOKEN}` }
-    });
-    if (!mediaRes.ok) throw new Error('Failed to download media buffer');
-    const buffer = await mediaRes.arrayBuffer();
-    return Buffer.from(buffer);
-}
-
-async function processAudioWhisper(buffer) {
-    const formData = new FormData();
-    formData.append('file', new Blob([buffer], { type: 'audio/ogg' }), 'audio.ogg');
-    formData.append('model', 'whisper-1');
-    formData.append('language', 'es');
-    
-    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-        body: formData
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    return data.text;
-}
-
-async function processImageGPT(buffer, mimeType) {
-    const base64 = buffer.toString('base64');
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [{
-                role: 'user',
-                content: [
-                    { type: 'text', text: 'Analiza esta imagen y extrae todo el texto o describe detalladamente qué contiene, enfocándote en el contenido educativo o planificación si lo hay. Sé directo, solo da la información.' },
-                    { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } }
-                ]
-            }],
-            max_tokens: 1000
-        })
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    return data.choices[0].message.content.trim();
-}
-
-async function processPDF(buffer) {
-    const data = await pdfParse(buffer);
-    return data.text.trim();
-}
-
-async function processWord(buffer) {
-    const data = await mammoth.extractRawText({ buffer });
-    return data.value.trim();
-}
-
-            const systemWithRefs = MINERD_SYSTEM_PROMPT + refBlock;
-            const messages = [
-                { role: 'system', content: systemWithRefs },
-                ...historyMessages,
-                { role: 'user', content: text }
-            ];
-
-            // ══════════════════════════════════════════════════════════
-            // VIGILANTE DE PERFIL (corre en paralelo, no bloquea)
-            // Extrae datos del profesor de cada mensaje y actualiza
-            // los campos que aún estén vacíos en su perfil.
-            // ══════════════════════════════════════════════════════════
-            const profileWatcher = async () => {
-                try {
-                    // Solo actuar si hay campos vacíos que rellenar
-                    const missingFields = [];
-                    if (!user.name || user.name.trim() === '') missingFields.push('name');
-                    if (!user.grade || user.grade.trim() === '') missingFields.push('grade');
-                    if (!user.area || user.area.trim() === '') missingFields.push('area');
-                    if (!user.school || user.school.trim() === '') missingFields.push('school');
-                    if (missingFields.length === 0) return; // perfil completo, nada que hacer
-
-                    const watcherPrompt = `Eres un extractor de datos silencioso. Analiza el texto de un profesor dominicano y extrae únicamente los datos solicitados si están presentes.
-
-CAMPOS A BUSCAR: ${missingFields.join(', ')}
-- name: Nombre completo del profesor (IGNORA palabras genéricas como: hola, ok, sí, no, bien, gracias, claro, listo, bueno, hey, buenas)
-- grade: Grado que enseña (ej: "3ro Primaria", "1ro Secundaria", "Kinder")
-- area: Materia o área (ej: "Matemáticas", "Lengua Española", "Ciencias")
-- school: Nombre del centro educativo
-
-Texto del profesor: "${text}"
-
-Responde ÚNICAMENTE con un JSON. Incluye solo los campos que puedas confirmar claramente. Si no encuentras un dato, NO lo incluyas en el JSON. Ejemplo: {"name": "María López", "grade": "4to Primaria"}
-Si no encuentras NADA, responde: {}`;
-
-                    const wr = await fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                        body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: watcherPrompt }], max_tokens: 100, temperature: 0 })
-                    });
-
-                    if (!wr.ok) return;
-                    const wd = await wr.json();
-                    const raw = wd?.choices?.[0]?.message?.content?.trim();
-                    if (!raw || raw === '{}') return;
-
-                    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
-                    if (!jsonMatch) return;
-
-                    const extracted = JSON.parse(jsonMatch[0]);
-                    const updates = {};
-
-                    // Solo actualizar campos que estaban vacíos y ahora tienen valor
-                    if (missingFields.includes('name') && extracted.name && extracted.name.length > 2) updates.name = extracted.name;
-                    if (missingFields.includes('grade') && extracted.grade) updates.grade = extracted.grade;
-                    if (missingFields.includes('area') && extracted.area) updates.area = extracted.area;
-                    if (missingFields.includes('school') && extracted.school) updates.school = extracted.school;
-
-                    if (Object.keys(updates).length > 0) {
-                        await getDb().collection('users').updateOne({ _id: user._id }, { $set: updates });
-                        console.log(`[VIGILANTE PERFIL] Actualizado perfil de ${from}:`, updates);
-                        req.app.emit('system_log', { type: 'VIGILANTE', color: '#f59e0b', title: 'Datos Extraídos', details: JSON.stringify(updates) });
-                    }
-                } catch (e) {
-                    console.error('[VIGILANTE PERFIL] Error silencioso:', e.message);
-                }
-            };
-
-            let reply = '⚠️ No pude procesar tu solicitud. Intenta de nuevo.';
-            
-            // Determinar si es trabajo de especialista (el router eligió algo distinto a Planixa Principal)
-            const isSpecialistWork = selectedPrompt && defaultPrompt && selectedPrompt._id.toString() !== defaultPrompt._id.toString();
-            // Determinar si hay formato activo o confirmación
-            const pendingFmtId = (activeConv && activeConv.pendingFormatId) || req.pendingFormatId;
-            const isDocConfirmation = /^(s[íi]|si|ok|dale|listo|genéralo|hazlo|adelante|perfecto|claro|mándamelo|envíamelo|si por favor|ya|bueno|sí quiero|quiero|generar)/i.test(text.trim());
-            const shouldWork = isSpecialistWork && (hasFormat || pendingFmtId || isDocConfirmation || text.length > 50);
-
-            if (shouldWork) {
-                // --- FLUJO MULTI-AGENTE (Especialista -> Supervisor -> Principal) ---
-                
-                // 1. Llamada al Especialista (usa systemWithRefs que tiene Base Conocimientos y Plantillas)
-                // Se invoca el perfilWatcher en paralelo para no perder tiempo
-                const [, specRes] = await Promise.all([
-                    profileWatcher(),
-                    fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                        body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 3000, temperature: 0.3, messages })
-                    }).catch(e => { console.error('Especialista error', e); return null; })
-                ]);
-
-                let specReply = '';
-                if (specRes && specRes.ok) {
-                    const d = await specRes.json();
-                    if (d.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Especialista', 'gpt-4o-mini', d.usage);
-                    specReply = d?.choices?.[0]?.message?.content?.trim() || '';
-                }
-
-                // Generación Forzada si el Especialista olvidó el [GENERATE_WORD]
-                const shouldForceGen = hasFormat && pendingFmtId && !specReply.includes('[GENERATE_WORD]');
-                if (shouldForceGen) {
-                    try {
-                        const fmtDoc2 = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(pendingFmtId) });
-                        if (fmtDoc2) {
-                            const convoContext = historyMessages.map(m => (m.role === 'user' ? 'Profesor' : 'Asistente') + ': ' + m.content).join('\n') + '\nProfesor: ' + text;
-                            const forcedPrompt = `Eres un experto generador de planificaciones docentes del MINERD.
-TAREA: Genera un JSON completo para rellenar una plantilla Word.
-${fmtDoc2.instructions || ''}
 DATOS DEL PROFESOR:
-- Nombre: ${user.name || 'No especificado'}
-- Grado: ${user.grade || 'No especificado'}
-- Área: ${user.area || 'No especificada'}
-CONVERSACIÓN:
-${convoContext}
-Responde ÚNICAMENTE con el bloque [GENERATE_WORD] seguido del JSON.`;
-                            const fr2 = await fetch('https://api.openai.com/v1/chat/completions', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                                body: JSON.stringify({ model: 'gpt-4o', max_tokens: 4000, temperature: 0.3, messages: [{ role: 'user', content: forcedPrompt }] })
-                            });
-                            if (fr2.ok) {
-                                const fd2 = await fr2.json();
-                                if (fd2.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Gen Forzada', 'gpt-4o', fd2.usage);
-                                const forcedReply = fd2?.choices?.[0]?.message?.content?.trim();
-                                if (forcedReply && forcedReply.includes('[GENERATE_WORD]')) specReply = forcedReply;
+Nombre: ${user.name || 'Profe'}
+Grado: ${user.grade || 'No especificado'}
+Área: ${user.area || 'No especificada'}
+Centro Educativo: ${user.school || 'No especificado'}
+
+REGLA DE PERFIL: Si el profesor expresa gusto/preferencia, usa la etiqueta [MEMORIA: pref]. Si el profesor dice su nombre/grado/área/escuela, usa la etiqueta [UPDATE_PROFILE: {"name":"...", "grade":"..."}].
+
+PLANTILLAS DISPONIBLES: ${availableFormats}.
+ESPECIALISTAS DISPONIBLES (BACK-OFFICE):
+${availableSpecialists.map(p => `- ID: ${p._id.toString()} | ${p.name} | Cuándo usar: ${p.description}`).join('\n')}
+
+TU ROL (EL ORQUESTADOR):
+Eres el único que interactúa con el profesor. Si el profesor pide generar una planificación, unidad, rúbrica, o cualquier estructura técnica, DEBES delegar usando la herramienta "consultar_especialista" pasando el ID adecuado y todas las instrucciones necesarias (tema, grado, etc.). NO intentes redactar la planificación tú mismo.
+Una vez que el especialista te devuelva la planificación cruda, audítala. Si está correcta, preséntala al profesor de manera amigable (usando el separador ||| para dividir tu saludo de la estructura, por ejemplo).
+Si el documento final requiere exportarse a Word, agrega al final de tu mensaje la etiqueta [GENERATE_DOCX] o [GENERATE_WORD] y el bloque \`\`\`json con los datos requeridos. NUNCA inventes enlaces de descarga web [Descargar](#).`;
+
+                const systemWithRefs = MINERD_SYSTEM_PROMPT + refBlock;
+                const messages = [
+                    { role: 'system', content: systemWithRefs },
+                    ...historyMessages,
+                    { role: 'user', content: text }
+                ];
+
+                const tools = [
+                    {
+                        type: "function",
+                        function: {
+                            name: "consultar_especialista",
+                            description: "Delega la creación de una planificación o estructura a un Especialista técnico en el back-office. Usa esto siempre que el profesor pida crear un material.",
+                            parameters: {
+                                type: "object",
+                                properties: {
+                                    especialista_id: { type: "string", description: "El ID del especialista seleccionado." },
+                                    instrucciones_detalladas: { type: "string", description: "Instrucciones detalladas y explícitas con TODO lo que el especialista necesita redactar (tema, grado, área, etc)." }
+                                },
+                                required: ["especialista_id", "instrucciones_detalladas"]
                             }
                         }
-                    } catch(e) { console.error('Forced Gen Error', e); }
-                }
+                    }
+                ];
 
-                // 2. Supervisor IA (El supervisor tiene reglas para respetar JSON)
-                let supervisedReply = (await callSupervisor(user._id.toString(), systemWithRefs, text, specReply)).text;
+                let reply = '⚠️ Ocurrió un error en el Orquestador.';
 
-                // 3. Planixa Principal (Envuelve el mensaje amigablemente)
-                const principalSystemPrompt = defaultPrompt.content + `\n\nDATOS DEL PROFESOR:\nNombre: ${user.name || 'Profe'}\nGrado: ${user.grade || 'No especificado'}\n\nERES LA SECRETARIA. Un Especialista ha generado el siguiente trabajo estructural para el profesor:\n---\n${supervisedReply}\n---\n\nTu tarea es entregarle esto al profesor de forma muy amable y profesional. \nREGLA DE ORO: DEBES incluir EXACTAMENTE el mismo bloque [GENERATE_WORD] con su JSON intacto al final de tu mensaje. NO MODIFIQUES EL JSON, SOLO AGREGA TU SALUDO AL PRINCIPIO. Usa el separador ||| entre tu charla y el documento.`;
-
-                const prinRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                const orquestadorRes = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                    body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 4000, temperature: 0.5, messages: [{ role: 'system', content: principalSystemPrompt }] })
-                }).catch(e => { console.error('Principal final error', e); return null; });
-                
-                if (prinRes && prinRes.ok) {
-                    const d = await prinRes.json();
-                    if (d.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Principal Delivery', 'gpt-4o-mini', d.usage);
-                    reply = d?.choices?.[0]?.message?.content?.trim() || supervisedReply;
-                } else {
-                    reply = supervisedReply;
-                }
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        messages: messages,
+                        tools: tools,
+                        tool_choice: "auto",
+                        max_tokens: 1500,
+                        temperature: 0.3
+                    })
+                });
 
-            } else {
-                // --- FLUJO NORMAL CONVERSACIONAL (Planixa Principal) ---
-                const [, prinRes] = await Promise.all([
-                    profileWatcher(),
-                    fetch('https://api.openai.com/v1/chat/completions', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
-                        body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 3000, temperature: 0.3, messages })
-                    }).catch(e => { console.error('Principal chat error', e); return null; })
-                ]);
+                if (orquestadorRes.ok) {
+                    const orqData = await orquestadorRes.json();
+                    if (orqData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador', 'gpt-4o', orqData.usage);
+                    
+                    const responseMessage = orqData.choices[0].message;
 
-                if (prinRes && prinRes.ok) {
-                    const d = await prinRes.json();
-                    if (d.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Principal Chat', 'gpt-4o-mini', d.usage);
-                    reply = d?.choices?.[0]?.message?.content?.trim() || reply;
-                }
+                    if (responseMessage.tool_calls) {
+                        messages.push(responseMessage);
+                        
+                        for (const toolCall of responseMessage.tool_calls) {
+                            if (toolCall.function.name === 'consultar_especialista') {
+                                const args = JSON.parse(toolCall.function.arguments);
+                                const specId = args.especialista_id;
+                                const specInst = args.instrucciones_detalladas;
+                                
+                                const specPromptDoc = prompts.find(p => p._id.toString() === specId);
+                                if (specPromptDoc) {
+                                    req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: 'Delegando al Back-Office', details: specPromptDoc.name });
+                                    
+                                    const specRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                                        body: JSON.stringify({
+                                            model: 'gpt-4o', 
+                                            messages: [
+                                                { role: 'system', content: specPromptDoc.content + refBlock },
+                                                { role: 'user', content: specInst }
+                                            ],
+                                            max_tokens: 3500,
+                                            temperature: 0.2
+                                        })
+                                    });
 
-                // Supervisor opcional
-                const supResult = await callSupervisor(user._id.toString(), systemWithRefs, text, reply);
-                reply = supResult.text;
-                
-                if (supResult.status === 'corrected') {
-                    req.app.emit('system_log', { type: 'SUPERVISOR', color: '#ef4444', title: 'Supervisor IA Corrigió', details: 'Respuesta original modificada por el supervisor.' });
-                } else if (supResult.status === 'approved') {
-                    req.app.emit('system_log', { type: 'SUPERVISOR', color: '#10b981', title: 'Supervisor IA Aprobó', details: 'Respuesta perfecta.' });
-                } else if (supResult.status === 'bypassed_length') {
-                    req.app.emit('system_log', { type: 'SUPERVISOR', color: '#64748b', title: 'Supervisor Omitido', details: 'Mensaje corto o no requiere revisión.' });
-                } else {
-                    req.app.emit('system_log', { type: 'SUPERVISOR', color: '#64748b', title: 'Supervisor Apagado', details: 'El sistema de calidad está desactivado.' });
+                                    let specResultText = 'Error en especialista.';
+                                    if (specRes.ok) {
+                                        const sData = await specRes.json();
+                                        if (sData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Especialista Back', 'gpt-4o', sData.usage);
+                                        specResultText = sData.choices[0].message.content;
+                                    }
+
+                                    messages.push({
+                                        tool_call_id: toolCall.id,
+                                        role: "tool",
+                                        name: "consultar_especialista",
+                                        content: specResultText
+                                    });
+                                } else {
+                                    messages.push({
+                                        tool_call_id: toolCall.id,
+                                        role: "tool",
+                                        name: "consultar_especialista",
+                                        content: "Error: Especialista no encontrado."
+                                    });
+                                }
+                            }
+                        }
+
+                        req.app.emit('system_log', { type: 'ORQUESTADOR', color: '#3b82f6', title: 'Auditando Trabajo', details: 'El Orquestador está revisando lo entregado.' });
+                        const finalRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                            body: JSON.stringify({
+                                model: 'gpt-4o',
+                                messages: messages,
+                                max_tokens: 3500,
+                                temperature: 0.4
+                            })
+                        });
+
+                        if (finalRes.ok) {
+                            const fData = await finalRes.json();
+                            if (fData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador Final', 'gpt-4o', fData.usage);
+                            reply = fData.choices[0].message.content.trim();
+                        }
+                    } else {
+                        reply = responseMessage.content?.trim() || '';
+                    }
                 }
+            } catch (err) {
+                console.error('Error en el Orquestador/Router:', err.message);
             }
 
             // SANITIZE LEAKED PROMPT DIRECTIVES
