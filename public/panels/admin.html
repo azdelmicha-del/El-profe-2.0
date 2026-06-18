@@ -10,7 +10,9 @@
         <span style="color:var(--border); user-select:none;">|</span>
         <span id="adminTabBroadcast" style="cursor:pointer; color:var(--text-light); transition:color 0.2s;">📢 Difusión</span>
         <span style="color:var(--border); user-select:none;">|</span>
-        <span id="adminTabConfig" style="cursor:pointer; color:var(--text-light); transition:color 0.2s;">⚙️ Config IA</span>
+        <span id="adminTabOrchestrator" style="cursor:pointer; color:var(--text-light); transition:color 0.2s;">🧠 Cerebro Principal</span>
+        <span style="color:var(--border); user-select:none;">|</span>
+        <span id="adminTabConfig" style="cursor:pointer; color:var(--text-light); transition:color 0.2s;">⚙️ Equipo Back-Office</span>
         <span style="color:var(--border); user-select:none;">|</span>
         <span id="adminTabFormats" style="cursor:pointer; color:var(--text-light); transition:color 0.2s;">📝 Plantillas</span>
         <span style="color:var(--border); user-select:none;">|</span>
@@ -170,13 +172,24 @@
             <tbody id="adminManageTableBody"></tbody>
           </table>
         </div>
+        <div id="adminOrchestratorView" style="display:none; flex:1; padding:20px; overflow-y:auto; flex-direction:column; gap:15px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3>Cerebro Principal (Orquestador)</h3>
+              <p style="font-size:13px; color:var(--text-light);">La personalidad principal que interactúa con el usuario, coordina a los especialistas y audita el trabajo.</p>
+            </div>
+          </div>
+          <div id="adminOrchestratorList" style="display:grid; grid-template-columns:1fr; gap:15px; margin-top:10px;">
+            <!-- Orchestrator injected here -->
+          </div>
+        </div>
         <div id="adminPromptView" style="display:none; flex:1; padding:20px; overflow-y:auto; flex-direction:column; gap:15px;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
-              <h3>Agentes Especialistas (Prompts)</h3>
-              <p style="font-size:13px; color:var(--text-light);">Crea diferentes agentes. El Router de IA decidirá cuál usar automáticamente según el mensaje del usuario.</p>
+              <h3>Equipo Especialistas (Back-Office)</h3>
+              <p style="font-size:13px; color:var(--text-light);">Crea diferentes especialistas. El Orquestador decidirá cuál usar automáticamente según lo que pida el maestro.</p>
             </div>
-            <button id="adminNewPromptBtn" style="padding:8px 15px; background:var(--primary); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">+ Nuevo Agente</button>
+            <button id="adminNewPromptBtn" style="padding:8px 15px; background:var(--primary); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">+ Nuevo Especialista</button>
           </div>
           <input type="text" id="searchPromptInput" placeholder="🔍 Buscar por nombre o descripción..." style="width:100%; padding:10px 15px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; margin-top:5px; margin-bottom:5px;" oninput="window.filterPrompts()">
           <div id="adminPromptList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:15px; margin-top:10px;">

@@ -12,8 +12,8 @@ window.initAdminPanel = function() {
   }
 
   function switchAdminTab(activeTabId, activeViewId, callback) {
-    const tabs = ['adminTabDash', 'adminTabUsers', 'adminTabManage', 'adminTabBroadcast', 'adminTabConfig', 'adminTabFormats', 'adminTabKnowledge', 'adminTabMonitor'];
-    const views = ['adminDashView', 'adminChatView', 'adminManageView', 'adminBroadcastView', 'adminPromptView', 'adminFormatView', 'adminKnowledgeView', 'adminMonitorView'];
+    const tabs = ['adminTabDash', 'adminTabUsers', 'adminTabManage', 'adminTabBroadcast', 'adminTabOrchestrator', 'adminTabConfig', 'adminTabFormats', 'adminTabKnowledge', 'adminTabMonitor'];
+    const views = ['adminDashView', 'adminChatView', 'adminManageView', 'adminBroadcastView', 'adminOrchestratorView', 'adminPromptView', 'adminFormatView', 'adminKnowledgeView', 'adminMonitorView'];
     
     tabs.forEach(tab => {
       const el = document.getElementById(tab);
@@ -54,6 +54,7 @@ window.initAdminPanel = function() {
   document.getElementById('adminTabUsers')?.addEventListener('click', () => switchAdminTab('adminTabUsers', 'adminChatView'));
   document.getElementById('adminTabManage')?.addEventListener('click', () => switchAdminTab('adminTabManage', 'adminManageView', renderAdminManageTable));
   document.getElementById('adminTabBroadcast')?.addEventListener('click', () => switchAdminTab('adminTabBroadcast', 'adminBroadcastView'));
+  document.getElementById('adminTabOrchestrator')?.addEventListener('click', () => switchAdminTab('adminTabOrchestrator', 'adminOrchestratorView', loadAdminPrompts));
   document.getElementById('adminTabConfig')?.addEventListener('click', () => switchAdminTab('adminTabConfig', 'adminPromptView', loadAdminPrompts));
   document.getElementById('adminTabFormats')?.addEventListener('click', () => switchAdminTab('adminTabFormats', 'adminFormatView', loadAdminFormats));
   document.getElementById('adminTabKnowledge')?.addEventListener('click', () => switchAdminTab('adminTabKnowledge', 'adminKnowledgeView', window.loadKnowledgeItems));
@@ -254,10 +255,14 @@ window.filterPrompts = function() {
 };
 
 function renderAdminPrompts(items = adminPrompts) {
-  const list = document.getElementById('adminPromptList');
-  if (!list) return;
-  list.innerHTML = '';
+  const orchestratorList = document.getElementById('adminOrchestratorList');
+  const promptList = document.getElementById('adminPromptList');
+  if (orchestratorList) orchestratorList.innerHTML = '';
+  if (promptList) promptList.innerHTML = '';
+  
   items.forEach(p => {
+    const isOrchestrator = p.name && p.name.replace(/_/g, ' ').trim().toLowerCase() === 'planixa asistente';
+    
     const card = document.createElement('div');
     card.style.padding = '15px';
     card.style.background = 'var(--bg-hover)';
@@ -266,11 +271,16 @@ function renderAdminPrompts(items = adminPrompts) {
     card.style.cursor = 'pointer';
     card.style.overflow = 'hidden';
     card.innerHTML = `
-      <h4 style="margin:0 0 5px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${p.name}">${p.name}</h4>
+      <h4 style="margin:0 0 5px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color:${isOrchestrator ? '#8b5cf6' : 'inherit'}" title="${p.name}">${isOrchestrator ? '🧠 ' : '⚙️ '}${p.name}</h4>
       <p style="font-size:12px; color:var(--text-light); margin:0;">${(p.description || '').substring(0, 80)}...</p>
     `;
     card.onclick = () => openPromptModal(p);
-    list.appendChild(card);
+    
+    if (isOrchestrator && orchestratorList) {
+      orchestratorList.appendChild(card);
+    } else if (promptList) {
+      promptList.appendChild(card);
+    }
   });
 }
 
