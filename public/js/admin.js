@@ -1287,7 +1287,7 @@ let monitorEventSource = null;
 window.startSystemMonitor = function() {
   if (monitorEventSource) return; // Ya está corriendo
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('planif_token');
   if (!token) return;
 
   monitorEventSource = new EventSource(`/api/admin/monitor/stream?token=${encodeURIComponent(token)}`);
