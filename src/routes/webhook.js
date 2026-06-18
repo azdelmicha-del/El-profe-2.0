@@ -221,6 +221,8 @@ Eres el encargado de interactuar con el profesor y coordinar el trabajo.
                             }
                         }
                     }
+                ];
+
                 reply = '⚠️ Ocurrió un error en el Orquestador.';
 
                 const orquestadorRes = await fetch('https://api.openai.com/v1/chat/completions', {
