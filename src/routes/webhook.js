@@ -642,7 +642,23 @@ Responde ÚNICAMENTE con el bloque [GENERATE_WORD] seguido del JSON.`;
                         jsonData = JSON.parse(jsonMatch[1]);
                     }
 
-                    const fmtId = (activeConv && activeConv.pendingFormatId) || req.pendingFormatId;
+                    let fmtId = (activeConv && activeConv.pendingFormatId) || req.pendingFormatId;
+
+                    // --- FALLBACK DE EMERGENCIA ---
+                    if (!fmtId && Object.keys(jsonData).length > 0) {
+                        console.log('[WORD GEN] No hay pendingFormatId, intentando adivinar desde el JSON generado...');
+                        const allFormats = await getDb().collection('doc_formats').find({}).toArray();
+                        const jStr = JSON.stringify(jsonData).toLowerCase();
+                        let bestFmt = null;
+                        if (jStr.includes('inicial')) bestFmt = allFormats.find(f => f.type.toLowerCase().includes('inicial'));
+                        else if (jStr.includes('primari')) bestFmt = allFormats.find(f => f.type.toLowerCase().includes('primari'));
+                        else if (jStr.includes('modalidad') && jStr.includes('secundari')) bestFmt = allFormats.find(f => f.type.toLowerCase().includes('modalidad'));
+                        else if (jStr.includes('secundari')) bestFmt = allFormats.find(f => f.type.toLowerCase().includes('secundari') && !f.type.toLowerCase().includes('modalidad'));
+                        
+                        if (bestFmt) fmtId = bestFmt._id.toString();
+                        else if (allFormats.length > 0) fmtId = allFormats[0]._id.toString(); // último recurso
+                    }
+
                     if (fmtId) {
                         const formatDoc = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(fmtId) });
                         if (formatDoc && formatDoc.filePath) {
