@@ -153,6 +153,7 @@ module.exports = function (app) {
             let hasFormat = false; // declarado fuera del try para que sea accesible en la generación forzada
             let defaultPrompt = null;
             let selectedPrompt = null;
+            let reply = '';
             
             try {
                 // Fetch prompts
@@ -220,11 +221,8 @@ Eres el encargado de interactuar con el profesor y coordinar el trabajo.
                             }
                         }
                     }
-                ];
+                reply = '⚠️ Ocurrió un error en el Orquestador.';
 
-                let reply = '⚠️ Ocurrió un error en el Orquestador.';
-
-                console.log('>>> [DEBUG] Llamando a OpenAI Orquestador...');
                 const orquestadorRes = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
@@ -237,7 +235,6 @@ Eres el encargado de interactuar con el profesor y coordinar el trabajo.
                         temperature: 0.3
                     })
                 });
-                console.log('>>> [DEBUG] OpenAI respondió con status:', orquestadorRes.status);
 
                 if (orquestadorRes.ok) {
                     const orqData = await orquestadorRes.json();
@@ -317,9 +314,8 @@ Eres el encargado de interactuar con el profesor y coordinar el trabajo.
                         reply = responseMessage.content?.trim() || '';
                     }
                 }
-                console.log('>>> [DEBUG] Fin del bloque try del Orquestador. Reply:', reply.slice(0, 50));
             } catch (err) {
-                console.error('>>> [DEBUG] Error FATAL en el Orquestador/Router:', err.message, err.stack);
+                console.error('Error en el Orquestador/Router:', err.message, err.stack);
             }
 
             // SANITIZE LEAKED PROMPT DIRECTIVES
@@ -387,8 +383,7 @@ Eres el encargado de interactuar con el profesor y coordinar el trabajo.
                 const insertResult = await getDb().collection('conversations').insertOne(insertData);
                 activeConv = await getDb().collection('conversations').findOne({ _id: insertResult.insertedId });
             }
-            
-            console.log('>>> [DEBUG] A punto de guardar el mensaje saliente en DB...');
+
             await getDb().collection('client_messages').insertOne({ phone: from, message: reply, direction: 'outgoing', employeeId: null, employeeName: 'Bot WhatsApp', createdAt: new Date() });
 
             // --- 2. ENTREGA DE WORDS POR WHATSAPP ---
@@ -552,7 +547,7 @@ Eres el encargado de interactuar con el profesor y coordinar el trabajo.
             }
 
         } catch (err) {
-            console.error('>>> [DEBUG] WhatsApp webhook OUTER error FATAL:', err.message, err.stack);
+            console.error('WhatsApp webhook error:', err.message, err.stack);
         }
     });
 };
