@@ -192,9 +192,20 @@ module.exports = function (app) {
 
                 const availableSpecialists = prompts.filter(p => p._id.toString() !== defaultPrompt._id.toString());
                 const availableFormats = formats.map(f => f.type);
+                
+                const formatsDict = {};
+                formats.forEach(f => formatsDict[f._id.toString()] = f.type);
+                
+                const availableSpecialistsStr = availableSpecialists.map(s => {
+                    let supportedStr = "Todas";
+                    if (s.supported_formats && s.supported_formats.length > 0) {
+                        supportedStr = s.supported_formats.map(id => formatsDict[id] || id).join(', ');
+                    }
+                    return `- ${s.name} (Anclado a plantillas: ${supportedStr})`;
+                }).join('\\n');
 
                 MINERD_SYSTEM_PROMPT = defaultPrompt.content + 
-                                       `\n\n=== ESTADO DEL DOCENTE ===\nPerfil: ${user.name||'No especificado'}, Grado: ${user.grade||'No especificado'}, Área: ${user.area||'No especificada'}\n\n=== HERRAMIENTAS INTERNAS ===\nEspecialistas disponibles: ${availableSpecialists.map(s=>s.name).join(', ')}\nPlantillas disponibles: ${availableFormats.join(', ')}\n\n=== REGLA DE GENERACIÓN ===\n1. RECOLECTAR DATOS: Si no sabes grado, materia, tema o plantilla preferida, pregunta amablemente antes de avanzar.\n2. DELEGAR AL BACK-OFFICE: SÓLO cuando tengas claro qué tipo de estructura o documento quiere el maestro, DEBES delegar el trabajo usando la herramienta "consultar_especialista" pasando el ID adecuado y todas las instrucciones necesarias. NO intentes redactar la estructura técnica tú mismo.\n3. AUDITAR Y ENTREGAR: Una vez que el especialista te devuelva la estructura cruda, audítala. Si está correcta, preséntala al profesor de manera amigable.\n4. GENERACIÓN DE DOCUMENTO: SÓLO puedes agregar la etiqueta [GENERATE_DOCX] al final de tu mensaje si acabas de recibir una respuesta del especialista con el trabajo técnico. ¡Está PROHIBIDO usar [GENERATE_DOCX] si no has consultado al especialista en esta misma interacción!`;
+                                       `\\n\\n=== ESTADO DEL DOCENTE ===\\nPerfil: ${user.name||'No especificado'}, Grado: ${user.grade||'No especificado'}, Área: ${user.area||'No especificada'}\\n\\n=== HERRAMIENTAS INTERNAS ===\\nEspecialistas disponibles:\\n${availableSpecialistsStr}\\n\\nPlantillas disponibles: ${availableFormats.join(', ')}\\n\\n=== REGLA DE GENERACIÓN ===\\n1. RECOLECTAR DATOS: Si no sabes grado, materia, tema o plantilla preferida, pregunta amablemente antes de avanzar.\\n2. DELEGAR AL BACK-OFFICE: SÓLO cuando tengas claro qué tipo de estructura o documento quiere el maestro, DEBES delegar el trabajo usando la herramienta "consultar_especialista" pasando el ID adecuado (asegúrate de que el especialista soporte la plantilla elegida) y todas las instrucciones necesarias. NO intentes redactar la estructura técnica tú mismo.\\n3. AUDITAR Y ENTREGAR: Una vez que el especialista te devuelva la estructura cruda, audítala. Si está correcta, preséntala al profesor de manera amigable.\\n4. GENERACIÓN DE DOCUMENTO: SÓLO puedes agregar la etiqueta [GENERATE_DOCX] al final de tu mensaje si acabas de recibir una respuesta del especialista con el trabajo técnico. ¡Está PROHIBIDO usar [GENERATE_DOCX] si no has consultado al especialista en esta misma interacción!`;
 
                 // Removemos globalKnowledgeBlock del Orquestador para no distraerlo. Solo se lo enviamos al Especialista.
                 const systemWithRefs = MINERD_SYSTEM_PROMPT + refBlock;
@@ -272,8 +283,8 @@ module.exports = function (app) {
                                         body: JSON.stringify({
                                             model: 'gpt-4o', 
                                             messages: [
-                                                { role: 'system', content: specPromptDoc.content + refBlock + globalKnowledgeBlock },
-                                                { role: 'user', content: specInst + '\n\n' + dynamicInstructions }
+                                                { role: 'system', content: specPromptDoc.content },
+                                                { role: 'user', content: specInst + '\n\n' + dynamicInstructions + '\n\n' + refBlock + '\n\n' + globalKnowledgeBlock }
                                             ],
                                             max_tokens: 3500,
                                             temperature: 0.2

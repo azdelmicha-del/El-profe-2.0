@@ -237,6 +237,7 @@ let adminPrompts = [];
 
 async function loadAdminPrompts() {
   try {
+    if (adminFormats.length === 0) await loadAdminFormats(false); // Load formats quietly
     const res = await fetch('/api/admin/prompts', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') } });
     if (res.ok) {
       adminPrompts = await res.json();
@@ -248,10 +249,24 @@ async function loadAdminPrompts() {
 window.filterPrompts = function() {
   const query = (document.getElementById('searchPromptInput').value || '').toLowerCase();
   const filtered = adminPrompts.filter(p => 
-    (p.name || '').toLowerCase().includes(query) || 
-    (p.description || '').toLowerCase().includes(query)
+    (p.name || '').toLowerCase().includes(query)
   );
   renderAdminPrompts(filtered);
+};
+
+window.filterCheckboxList = function(inputId, listId) {
+  const query = (document.getElementById(inputId).value || '').toLowerCase();
+  const list = document.getElementById(listId);
+  if (!list) return;
+  const labels = list.getElementsByTagName('label');
+  for (let i = 0; i < labels.length; i++) {
+    const text = labels[i].innerText.toLowerCase();
+    if (text.includes(query)) {
+      labels[i].style.display = 'flex';
+    } else {
+      labels[i].style.display = 'none';
+    }
+  }
 };
 
 function renderAdminPrompts(items = adminPrompts) {
@@ -272,7 +287,6 @@ function renderAdminPrompts(items = adminPrompts) {
     card.style.overflow = 'hidden';
     card.innerHTML = `
       <h4 style="margin:0 0 5px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color:${isOrchestrator ? '#8b5cf6' : 'inherit'}" title="${p.name}">${isOrchestrator ? '🧠 ' : '⚙️ '}${p.name}</h4>
-      <p style="font-size:12px; color:var(--text-light); margin:0;">${(p.description || '').substring(0, 80)}...</p>
     `;
     card.onclick = () => openPromptModal(p);
     
@@ -286,11 +300,30 @@ function renderAdminPrompts(items = adminPrompts) {
 
 function openPromptModal(prompt) {
   document.getElementById('adminPromptModal').style.display = 'flex';
+
+  const formatsList = document.getElementById('adminPromptFormatsList');
+  formatsList.innerHTML = '';
+  const supported = prompt ? (prompt.supported_formats || []) : [];
+  adminFormats.forEach(f => {
+    const isChecked = supported.includes(f.id) ? 'checked' : '';
+    formatsList.innerHTML += `
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:5px; font-size:12px;">
+        <input type="checkbox" class="prompt-format-checkbox" value="${f.id}" ${isChecked}>
+        ${f.type}
+      </label>
+    `;
+  });
+
   if (prompt) {
     document.getElementById('adminPromptModalTitle').innerText = 'Editar Agente';
     document.getElementById('adminPromptId').value = prompt.id;
     document.getElementById('adminPromptName').value = prompt.name || '';
-    document.getElementById('adminPromptDesc').value = prompt.description || '';
+    
+    // Hide formats selector for the Orchestrator since it doesn't execute them directly
+    const isOrch = (prompt.name || '').replace(/_/g, ' ').trim().toLowerCase() === 'planixa asistente';
+    const container = document.getElementById('adminPromptFormatsContainer');
+    if (container) container.style.display = isOrch ? 'none' : 'block';
+
     document.getElementById('adminPromptContent').value = prompt.content || '';
     document.getElementById('adminPromptDeleteBtn').style.display = 'block';
     document.getElementById('countPrompt').innerText = (prompt.content || '').length + ' / 6000';
@@ -298,7 +331,8 @@ function openPromptModal(prompt) {
     document.getElementById('adminPromptModalTitle').innerText = 'Nuevo Agente';
     document.getElementById('adminPromptId').value = '';
     document.getElementById('adminPromptName').value = '';
-    document.getElementById('adminPromptDesc').value = '';
+    const container = document.getElementById('adminPromptFormatsContainer');
+    if (container) container.style.display = 'block';
     document.getElementById('adminPromptContent').value = '';
     document.getElementById('adminPromptDeleteBtn').style.display = 'none';
     document.getElementById('countPrompt').innerText = '0 / 6000';
@@ -308,8 +342,10 @@ function openPromptModal(prompt) {
 async function saveAdminPrompt() {
   const id = document.getElementById('adminPromptId').value;
   const name = document.getElementById('adminPromptName').value;
-  const description = document.getElementById('adminPromptDesc').value;
+  const description = ""; // Deprecated, but keep empty string for backend compatibility if needed
   const content = document.getElementById('adminPromptContent').value;
+  const supported_formats = Array.from(document.querySelectorAll('.prompt-format-checkbox:checked')).map(cb => cb.value);
+
   if (!name || !content) return await PremiumModal.alert('Nombre y Contenido son requeridos');
   
   const method = id ? 'PUT' : 'POST';
@@ -318,7 +354,7 @@ async function saveAdminPrompt() {
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') },
-      body: JSON.stringify({ name, description, content })
+      body: JSON.stringify({ name, description, content, supported_formats })
     });
     if (res.ok) {
       document.getElementById('adminPromptModal').style.display = 'none';
@@ -348,12 +384,13 @@ async function deleteAdminPrompt() {
 // --- FORMATS LOGIC ---
 let adminFormats = [];
 
-async function loadAdminFormats() {
+async function loadAdminFormats(render = true) {
   try {
+    if (adminPrompts.length === 0 && render) await loadAdminPrompts(); // Load prompts quietly
     const res = await fetch('/api/admin/formats', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') } });
     if (res.ok) {
       adminFormats = await res.json();
-      renderAdminFormats();
+      if (render) renderAdminFormats();
     }
   } catch (err) { console.error(err); }
 }
@@ -395,6 +432,19 @@ function renderAdminFormats(items = adminFormats) {
 
 function openFormatModal(format) {
   document.getElementById('adminFormatModal').style.display = 'flex';
+
+  const promptsList = document.getElementById('adminFormatPromptsList');
+  promptsList.innerHTML = '';
+  adminPrompts.forEach(p => {
+    const isChecked = format && (p.supported_formats || []).includes(format.id) ? 'checked' : '';
+    promptsList.innerHTML += `
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:5px; font-size:12px;">
+        <input type="checkbox" class="format-prompt-checkbox" value="${p.id}" ${isChecked}>
+        ${p.name}
+      </label>
+    `;
+  });
+
   if (format) {
     document.getElementById('adminFormatModalTitle').innerText = 'Editar Formato';
     document.getElementById('adminFormatId').value = format.id;
@@ -433,6 +483,8 @@ async function saveAdminFormat() {
   if (fileInput.files.length > 0) {
     formData.append('templateFile', fileInput.files[0]);
   }
+  const supported_prompts = Array.from(document.querySelectorAll('.format-prompt-checkbox:checked')).map(cb => cb.value);
+  formData.append('supported_prompts', JSON.stringify(supported_prompts));
   
   const method = id ? 'PUT' : 'POST';
   const url = id ? '/api/admin/formats/' + id : '/api/admin/formats';

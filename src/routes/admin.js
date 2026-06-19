@@ -505,17 +505,23 @@ Si no pide un PDF explícitamente, responde normalmente.`;
                 defaultPrompt._id = result.insertedId;
                 prompts = [defaultPrompt];
             }
-            res.json(prompts.map(p => ({ id: p._id.toString(), name: p.name, description: p.description, content: p.content })));
+            res.json(prompts.map(p => ({ 
+                id: p._id.toString(), 
+                name: p.name, 
+                description: p.description, 
+                content: p.content,
+                supported_formats: p.supported_formats || [] 
+            })));
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
 
     app.post('/api/admin/prompts', authenticateToken, async (req, res) => {
         if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
         try {
-            const { name, description, content } = req.body;
+            const { name, description, content, supported_formats } = req.body;
             if (!name || !content) return res.status(400).json({ error: 'Nombre y contenido son requeridos' });
             
-            const newPrompt = { name, description, content, created_at: new Date() };
+            const newPrompt = { name, description, content, supported_formats: supported_formats || [], created_at: new Date() };
             const result = await getDb().collection('prompts').insertOne(newPrompt);
             res.json({ success: true, id: result.insertedId });
         } catch (err) { res.status(500).json({ error: err.message }); }
@@ -525,8 +531,8 @@ Si no pide un PDF explícitamente, responde normalmente.`;
         if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
         try {
             const _id = new mongoose.Types.ObjectId(req.params.id);
-            const { name, description, content } = req.body;
-            await getDb().collection('prompts').updateOne({ _id }, { $set: { name, description, content, updated_at: new Date() } });
+            const { name, description, content, supported_formats } = req.body;
+            await getDb().collection('prompts').updateOne({ _id }, { $set: { name, description, content, supported_formats: supported_formats || [], updated_at: new Date() } });
             res.json({ success: true });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
@@ -571,6 +577,29 @@ Si no pide un PDF explícitamente, responde normalmente.`;
             }
 
             const result = await getDb().collection('doc_formats').insertOne(newFormat);
+            
+            if (req.body.supported_prompts) {
+                try {
+                    const promptIds = JSON.parse(req.body.supported_prompts);
+                    if (Array.isArray(promptIds)) {
+                        const db = getDb();
+                        // First, remove this format from all prompts to cleanly sync
+                        await db.collection('prompts').updateMany(
+                            {},
+                            { $pull: { supported_formats: result.insertedId.toString() } }
+                        );
+                        // Then add it to the selected prompts
+                        if (promptIds.length > 0) {
+                            const pIds = promptIds.map(id => new mongoose.Types.ObjectId(id));
+                            await db.collection('prompts').updateMany(
+                                { _id: { $in: pIds } },
+                                { $addToSet: { supported_formats: result.insertedId.toString() } }
+                            );
+                        }
+                    }
+                } catch(e) { console.error('Error parsing supported_prompts', e); }
+            }
+            
             res.json({ success: true, id: result.insertedId });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
@@ -589,6 +618,30 @@ Si no pide un PDF explícitamente, responde normalmente.`;
             }
             
             await getDb().collection('doc_formats').updateOne({ _id }, { $set: updateData });
+            
+            if (req.body.supported_prompts) {
+                try {
+                    const promptIds = JSON.parse(req.body.supported_prompts);
+                    if (Array.isArray(promptIds)) {
+                        const db = getDb();
+                        const formatIdStr = _id.toString();
+                        // First, remove this format from all prompts to cleanly sync
+                        await db.collection('prompts').updateMany(
+                            {},
+                            { $pull: { supported_formats: formatIdStr } }
+                        );
+                        // Then add it to the selected prompts
+                        if (promptIds.length > 0) {
+                            const pIds = promptIds.map(id => new mongoose.Types.ObjectId(id));
+                            await db.collection('prompts').updateMany(
+                                { _id: { $in: pIds } },
+                                { $addToSet: { supported_formats: formatIdStr } }
+                            );
+                        }
+                    }
+                } catch(e) { console.error('Error parsing supported_prompts', e); }
+            }
+
             res.json({ success: true });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });

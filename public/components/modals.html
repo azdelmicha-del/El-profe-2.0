@@ -329,17 +329,20 @@
 </div>
 
 <div id="adminPromptModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
-  <div style="background:var(--bg); padding:20px; border-radius:12px; width:500px; max-width:90%;">
+  <div style="background:var(--bg); padding:20px; border-radius:12px; width:800px; max-width:95%;">
     <h3 id="adminPromptModalTitle">Agente Especialista</h3>
     <input type="hidden" id="adminPromptId">
     <div style="margin-top:15px;">
       <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Nombre del Especialista</label>
       <input type="text" id="adminPromptName" placeholder="Ej: Especialista en Matemáticas" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
     </div>
-    <div style="margin-top:15px;">
-      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Descripción para el Enrutador (Crucial)</label>
-      <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Instrucción corta para que el Router sepa cuándo usar este agente.</p>
-      <input type="text" id="adminPromptDesc" placeholder="Ej: Usa este prompt SOLO si el usuario pide una evaluación de matemáticas." style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
+    <div style="margin-top:15px;" id="adminPromptFormatsContainer">
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Plantillas Vinculadas</label>
+      <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Selecciona las plantillas que este agente puede rellenar.</p>
+      <input type="text" id="searchFormatCheckboxInput" placeholder="Buscar plantilla..." onkeyup="filterCheckboxList('searchFormatCheckboxInput', 'adminPromptFormatsList')" style="width:100%; padding:6px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); margin-bottom:5px; font-size:12px;">
+      <div id="adminPromptFormatsList" style="max-height:150px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:8px; background:var(--bg-hover);">
+        <!-- Checkboxes generados dinámicamente -->
+      </div>
     </div>
     <div style="margin-top:15px;">
       <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Contenido del Prompt (Cerebro)</label>
@@ -357,7 +360,7 @@
 </div>
 
 <div id="adminFormatModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
-  <div style="background:var(--bg); padding:20px; border-radius:12px; width:500px; max-width:90%;">
+  <div style="background:var(--bg); padding:20px; border-radius:12px; width:800px; max-width:95%;">
     <h3 id="adminFormatModalTitle">Formato Documental (PDF/Word)</h3>
     <input type="hidden" id="adminFormatId">
     <div style="margin-top:15px;">
@@ -370,6 +373,14 @@
       <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Sube el documento Word con las etiquetas {{variables}}.</p>
       <input type="file" id="adminFormatFile" accept=".docx" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
       <p id="adminFormatFileStatus" style="font-size:11px; color:var(--primary); margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></p>
+    </div>
+    <div style="margin-top:15px;" id="adminFormatPromptsContainer">
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Agentes Especialistas Vinculados</label>
+      <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Selecciona qué especialistas saben llenar esta plantilla.</p>
+      <input type="text" id="searchPromptCheckboxInput" placeholder="Buscar especialista..." onkeyup="filterCheckboxList('searchPromptCheckboxInput', 'adminFormatPromptsList')" style="width:100%; padding:6px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); margin-bottom:5px; font-size:12px;">
+      <div id="adminFormatPromptsList" style="max-height:150px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:8px; background:var(--bg-hover);">
+        <!-- Checkboxes generados dinámicamente -->
+      </div>
     </div>
     <div style="margin-top:15px;">
       <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Instrucciones para la IA (Opcional)</label>
