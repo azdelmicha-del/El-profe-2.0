@@ -225,9 +225,10 @@ module.exports = function (app) {
                                 type: "object",
                                 properties: {
                                     especialista_id: { type: "string", description: "El ID del especialista seleccionado." },
+                                    plantilla_nombre: { type: "string", description: "El nombre exacto de la plantilla seleccionada de la lista de Plantillas disponibles." },
                                     instrucciones_detalladas: { type: "string", description: "Instrucciones detalladas y explícitas con TODO lo que el especialista necesita redactar (tema, grado, área, etc)." }
                                 },
-                                required: ["especialista_id", "instrucciones_detalladas"]
+                                required: ["especialista_id", "plantilla_nombre", "instrucciones_detalladas"]
                             }
                         }
                     }
@@ -262,7 +263,18 @@ module.exports = function (app) {
                                 const args = JSON.parse(toolCall.function.arguments);
                                 const specId = args.especialista_id;
                                 const specInst = args.instrucciones_detalladas;
+                                const plantillaNombre = args.plantilla_nombre;
                                 finalSpecIdUsed = specId;
+
+                                // Guardar el ID del formato de la plantilla explícitamente seleccionado
+                                if (plantillaNombre) {
+                                    const selectedFmt = formats.find(f => f.type === plantillaNombre);
+                                    if (selectedFmt) {
+                                        if (activeConv) activeConv.pendingFormatId = selectedFmt._id.toString();
+                                        req.pendingFormatId = selectedFmt._id.toString();
+                                        req.app.emit('system_log', { type: 'SISTEMA', color: '#10b981', title: 'Plantilla Fijada', details: plantillaNombre });
+                                    }
+                                }
                                 
                                 // Buscar por nombre (como lo genera el LLM) o por ID (fallback)
                                 const specPromptDoc = prompts.find(p => p.name === specId || p._id.toString() === specId);
