@@ -481,7 +481,7 @@ Eres el encargado de interactuar con el profesor y coordinar el trabajo.
                             }
 
                             // nullGetter evita que claves faltantes tiren error
-                            const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => '' });
+                            const doc = new Docxtemplater(zip, { delimiters: { start: '{{', end: '}}' }, paragraphLoop: true, linebreaks: true, nullGetter: () => '' });
                             doc.render(jsonData);
 
                             const buf = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
