@@ -320,9 +320,13 @@ ${recentMessagesText || 'No hay mensajes recientes.'}
                     else if (u.plan_expires && new Date(u.plan_expires) > now) isActivePro = true;
                     
                     if (isActivePro) {
-                        proUsersCount++;
-                        if (u.plan !== 'lifetime' && u.plan !== 'trial') {
-                            mrr += (planPrices[u.plan] || 190);
+                        if (u.plan === 'trial') {
+                            freeUsersCount++;
+                        } else {
+                            proUsersCount++;
+                            if (u.plan !== 'lifetime') {
+                                mrr += (planPrices[u.plan] || 190);
+                            }
                         }
                     } else {
                         freeUsersCount++; // Expirados cuentan como gratis
