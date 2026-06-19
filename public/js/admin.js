@@ -732,36 +732,19 @@ window.sendAdminReply = async function(userId) {
   input.focus();
 }
 
-function updateAdminDashboard() {
-  const total = adminUsers.length;
-  let activePro = 0, free = 0, exempt = 0, totalPlans = 0, monthlyRev = 0;
-  
+async function updateAdminDashboard() {
+  // 1. Fetch real stats from backend
+  await loadAdminDashboard();
+
+  // 2. Draw Chart based on local adminUsers array
   const chartLabels = [];
   const chartData = [];
   const daysMap = {};
 
   adminUsers.forEach(u => {
-    totalPlans += (u.plans_count || 0);
-    if (u.plan === 'admin' || u.plan === 'exempt') exempt++;
-    else if (u.plan === 'trial') free++;
-    else activePro++;
-    
-    // Revenue calc approx
-    if (u.plan === '1 Mes') monthlyRev += 395;
-    if (u.plan === '3 Meses') monthlyRev += 1066 / 3;
-    if (u.plan === '6 Meses') monthlyRev += 2014 / 6;
-    if (u.plan === '1 Año') monthlyRev += 3792 / 12;
-
     const d = new Date(u.created_at || Date.now()).toLocaleDateString();
     daysMap[d] = (daysMap[d] || 0) + 1;
   });
-
-  document.getElementById('dashTotalUsers').innerText = total;
-  document.getElementById('dashActiveUsers').innerText = activePro;
-  document.getElementById('dashFreeUsers').innerText = free;
-  document.getElementById('dashExemptUsers').innerText = exempt;
-  document.getElementById('dashConversations').innerText = totalPlans;
-  document.getElementById('dashMRR').innerText = 'RD$ ' + Math.round(monthlyRev).toLocaleString();
 
   // Draw chart
   const last7Days = Array.from({length: 7}, (_, i) => {
