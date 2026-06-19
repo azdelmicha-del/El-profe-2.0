@@ -240,7 +240,7 @@ module.exports = function (app) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
                     body: JSON.stringify({
-                        model: 'gpt-4o',
+                        model: 'gpt-4o-mini',
                         messages: messages,
                         tools: tools,
                         tool_choice: "auto",
@@ -251,7 +251,7 @@ module.exports = function (app) {
 
                 if (orquestadorRes.ok) {
                     const orqData = await orquestadorRes.json();
-                    if (orqData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador', 'gpt-4o', orqData.usage);
+                    if (orqData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador', 'gpt-4o-mini', orqData.usage);
                     
                     const responseMessage = orqData.choices[0].message;
 
@@ -301,7 +301,7 @@ module.exports = function (app) {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
                                         body: JSON.stringify({
-                                            model: 'gpt-4o', 
+                                            model: 'gpt-4o-mini', 
                                             messages: [
                                                 { role: 'system', content: specPromptDoc.content },
                                                 { role: 'user', content: specInst + '\n\n' + dynamicInstructions + '\n\n' + refBlock + '\n\n' + globalKnowledgeBlock }
@@ -314,7 +314,7 @@ module.exports = function (app) {
                                     let specResultText = 'Error en especialista.';
                                     if (specRes.ok) {
                                         const sData = await specRes.json();
-                                        if (sData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Especialista Back', 'gpt-4o', sData.usage);
+                                        if (sData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Especialista Back', 'gpt-4o-mini', sData.usage);
                                         specResultText = sData.choices[0].message.content;
                                         
                                         // Extraer JSON directamente del especialista para no perderlo
@@ -356,7 +356,7 @@ module.exports = function (app) {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
                             body: JSON.stringify({
-                                model: 'gpt-4o',
+                                model: 'gpt-4o-mini',
                                 messages: messages,
                                 max_tokens: 3500,
                                 temperature: 0.4
@@ -365,7 +365,7 @@ module.exports = function (app) {
 
                         if (finalRes.ok) {
                             const fData = await finalRes.json();
-                            if (fData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador Final', 'gpt-4o', fData.usage);
+                            if (fData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador Final', 'gpt-4o-mini', fData.usage);
                             reply = fData.choices[0].message.content.trim();
                         }
                     } else {
