@@ -999,11 +999,11 @@ window.initFinancePanel = function() {
       const filterSelect = document.getElementById('financeModelFilter');
       const costDisplay = document.getElementById('financeModelCostDisplay');
       if (filterSelect && costDisplay && data.costsByModel) {
-        // Known models plus N/A
-        const knownModels = ['gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview', 'N/A'];
+        // Known specific models
+        const knownModels = ['gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview'];
         
-        // Merge known models with the ones retrieved from API
-        const mergedModelsData = [...data.costsByModel];
+        // Merge known models with the ones retrieved from API, but exclude N/A or null
+        const mergedModelsData = data.costsByModel.filter(m => m._id && m._id !== 'N/A');
         knownModels.forEach(km => {
             if (!mergedModelsData.find(m => m._id === km)) {
                 mergedModelsData.push({ _id: km, cost: 0, tokens: 0 });
@@ -1014,11 +1014,11 @@ window.initFinancePanel = function() {
         window.financeCostsByModel = mergedModelsData;
         
         // Limpiar y llenar opciones (manteniendo Ver Todos)
-        filterSelect.innerHTML = '<option value="all">Ver Todos</option>';
+        filterSelect.innerHTML = '<option value="all">📊 Ver Todos</option>';
         mergedModelsData.forEach(m => {
             const opt = document.createElement('option');
-            opt.value = m._id || 'Desconocido';
-            opt.textContent = (m._id === 'N/A') ? 'Ajustes / Otros' : (m._id || 'Desconocido');
+            opt.value = m._id;
+            opt.textContent = m._id;
             filterSelect.appendChild(opt);
         });
 

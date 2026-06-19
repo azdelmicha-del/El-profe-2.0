@@ -369,7 +369,7 @@ ${recentMessagesText || 'No hay mensajes recientes.'}
             // Agregar gastos por modelo
             const modelAggregation = await db.collection('api_usage').aggregate([
                 {
-                    $match: { cost: { $gt: 0 } }
+                    $match: { total_tokens: { $gt: 0 } }
                 },
                 {
                     $group: {
