@@ -141,6 +141,7 @@ module.exports = function (app) {
                     if (m.name) msg.name = m.name;
                     return msg;
                 });
+                req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#14b8a6', title: 'Memoria Cargada', details: `Se cargaron los últimos ${historyMessages.length} mensajes del historial.` });
             }
 
             const refDocs = await getDb().collection('references').find({ userId }).toArray();
@@ -152,7 +153,7 @@ module.exports = function (app) {
             const knowledgeItems = await getDb().collection('knowledge').find({}).toArray();
             let globalKnowledgeBlock = '';
             if (knowledgeItems && knowledgeItems.length > 0) {
-                req.app.emit('system_log', { type: 'SISTEMA', color: '#8b5cf6', title: 'Consultando Conocimientos', details: 'Extrayendo base curricular del MINERD.' });
+                req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#8b5cf6', title: 'Consultando Conocimientos', details: 'Extrayendo base curricular del MINERD.' });
                 globalKnowledgeBlock = '\n\n📚 BASE DE CONOCIMIENTOS OFICIAL (REGLAS Y DATOS GLOBALES OBLIGATORIOS):\n';
                 for (const item of knowledgeItems) {
                     globalKnowledgeBlock += `\n[${item.title}]:\n${item.content}\n---\n`;
@@ -237,6 +238,7 @@ module.exports = function (app) {
                 reply = '⚠️ Ocurrió un error en el Orquestador.';
 
                 const orqModel = selectedPrompt.model || 'gpt-4o-mini';
+                req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#8b5cf6', title: 'Consultando Orquestador', details: `Modelo: ${orqModel}. Enviando contexto y herramientas...` });
                 const orquestadorRes = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
@@ -273,7 +275,7 @@ module.exports = function (app) {
                                     if (selectedFmt) {
                                         if (activeConv) activeConv.pendingFormatId = selectedFmt._id.toString();
                                         req.pendingFormatId = selectedFmt._id.toString();
-                                        req.app.emit('system_log', { type: 'SISTEMA', color: '#10b981', title: 'Plantilla Fijada', details: plantillaNombre });
+                                        req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#10b981', title: 'Plantilla Fijada', details: plantillaNombre });
                                     }
                                 }
                                 
@@ -299,6 +301,7 @@ module.exports = function (app) {
                                     dynamicInstructions += '\n\nIMPORTANTE: ¡Si no incluyes el bloque ```json con los datos, el sistema fallará y el profesor no recibirá su documento! NO DEVUELVAS TEXTO DE RELLENO, SOLO EL INFORME Y EL JSON.';
 
                                     const specModel = specPromptDoc.model || 'gpt-4o-mini';
+                                    req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: 'Ejecutando Modelo', details: `Procesando con ${specModel}...` });
                                     const specRes = await fetch('https://api.openai.com/v1/chat/completions', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
@@ -353,8 +356,9 @@ module.exports = function (app) {
                             }
                         }
 
-                        req.app.emit('system_log', { type: 'ORQUESTADOR', color: '#3b82f6', title: 'Auditando Trabajo', details: 'El Orquestador está revisando lo entregado.' });
+                        req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#3b82f6', title: 'Auditando Trabajo', details: 'El Orquestador está revisando lo entregado.' });
                         const finalModel = selectedPrompt.model || 'gpt-4o-mini';
+                        req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#3b82f6', title: 'Generando Respuesta', details: `Escribiendo mensaje final con ${finalModel}...` });
                         const finalRes = await fetch('https://api.openai.com/v1/chat/completions', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
@@ -496,7 +500,7 @@ module.exports = function (app) {
                             const outDir = path.join(PROJECT_ROOT, 'public', 'downloads');
                             if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
-                            req.app.emit('system_log', { type: 'SISTEMA', color: '#10b981', title: 'Generando Documento', details: `Inyectando datos en: ${formatDoc.type}` });
+                            req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#10b981', title: 'Generando Documento', details: `Inyectando datos en: ${formatDoc.type}` });
 
                             const outFilename = `Documento-${from}-${Date.now()}.docx`;
                             const outPath = path.join(outDir, outFilename);

@@ -1,7 +1,7 @@
-const { getDb, connectMongo } = require('./src/db');
-connectMongo().then(async () => {
-    const db = getDb();
-    const docs = await db.collection('api_usage').find({ cost: { $gt: 0 }, model: "N/A" }).toArray();
-    console.log(JSON.stringify(docs, null, 2));
-    process.exit(0);
+const fs = require('fs');
+['src/routes/webhook.js', 'src/routes/chat.js'].forEach(f => {
+    let code = fs.readFileSync(f, 'utf8');
+    code = code.replace(/type: 'SISTEMA'/g, "type: 'PLANIXA ASISTENTE'");
+    fs.writeFileSync(f, code);
 });
+console.log('Replaced successfully');

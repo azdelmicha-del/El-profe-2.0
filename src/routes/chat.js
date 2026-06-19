@@ -204,6 +204,7 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                     
                     const specModel = selectedPrompt.model || 'gpt-4o-mini';
                     // 1. Especialista
+                    req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: 'Delegando al Back-Office', details: `Procesando en web con ${specModel}...` });
                     const specRes = await fetch('https://api.openai.com/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
@@ -240,6 +241,7 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                     }
 
                     // 2. Supervisor IA
+                    req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#10b981', title: 'Supervisando Generación', details: 'Supervisor IA verificando el documento...' });
                     let supervisedReply = (await callSupervisor(userId, systemWithRefs, message, specReply)).text;
 
                     // 3. Planixa Principal (Entrega Web)
@@ -263,6 +265,7 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                 } else {
                     // --- FLUJO NORMAL (Planixa Principal) ---
                     const normModel = defaultPrompt.model || 'gpt-4o-mini';
+                    req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#8b5cf6', title: 'Consultando Asistente', details: `Procesando flujo normal con ${normModel}...` });
                     const r = await fetch('https://api.openai.com/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
