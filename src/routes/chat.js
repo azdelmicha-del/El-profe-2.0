@@ -167,7 +167,10 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                 for (const item of knowledgeItems) {
                     globalKnowledgeBlock += `\n[${item.title}]:\n${item.content}\n---\n`;
                 }
-                globalKnowledgeBlock += 'USA ESTA BASE DE CONOCIMIENTOS COMO VERDAD ABSOLUTA para responder.\n';
+                if (globalKnowledgeBlock.length > 150000) {
+                    globalKnowledgeBlock = globalKnowledgeBlock.substring(0, 150000) + '\n...[CONTENIDO RECORTADO POR LÍMITE DE MEMORIA DEL SISTEMA]';
+                }
+                globalKnowledgeBlock += 'USA ESTA BASE DE CONOCIMIENTOS COMO FUENTE PRINCIPAL DE VERDAD. SI UN DATO ESTÁ AQUÍ, ES OFICIAL DEL MINERD.\n';
             }
         } catch (err) {
             console.error("Error fetching knowledge base", err);
