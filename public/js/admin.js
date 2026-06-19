@@ -999,12 +999,23 @@ window.initFinancePanel = function() {
       const filterSelect = document.getElementById('financeModelFilter');
       const costDisplay = document.getElementById('financeModelCostDisplay');
       if (filterSelect && costDisplay && data.costsByModel) {
+        // Known models plus N/A
+        const knownModels = ['gpt-4o-mini', 'gpt-4o', 'o1-mini', 'o1-preview', 'N/A'];
+        
+        // Merge known models with the ones retrieved from API
+        const mergedModelsData = [...data.costsByModel];
+        knownModels.forEach(km => {
+            if (!mergedModelsData.find(m => m._id === km)) {
+                mergedModelsData.push({ _id: km, cost: 0, tokens: 0 });
+            }
+        });
+
         // Guardar datos temporalmente para filtrar rápido
-        window.financeCostsByModel = data.costsByModel;
+        window.financeCostsByModel = mergedModelsData;
         
         // Limpiar y llenar opciones (manteniendo Ver Todos)
         filterSelect.innerHTML = '<option value="all">Ver Todos</option>';
-        data.costsByModel.forEach(m => {
+        mergedModelsData.forEach(m => {
             const opt = document.createElement('option');
             opt.value = m._id || 'Desconocido';
             opt.textContent = (m._id === 'N/A') ? 'Ajustes / Otros' : (m._id || 'Desconocido');
