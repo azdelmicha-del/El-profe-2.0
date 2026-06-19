@@ -70,7 +70,7 @@
       <button class="nav-tab" data-tab="customTemplates">📝 Mis Plantillas</button>
       <button class="nav-tab" data-tab="journal">📓 Diario</button>
       <button class="nav-tab" data-tab="competencias">🎯 Competencias</button>
-      <button class="nav-tab" data-tab="supervisor" id="supervisorNavTab" style="display:none; color: #f59e0b;">👁️ Supervisor IA</button>
+      <button class="nav-tab" data-tab="supervisor" id="supervisorNavTab" style="display:none; color: #f59e0b;">🖥️ Monitor de Sistema</button>
       <button class="nav-tab" data-tab="finance" id="financeNavTab" style="display:none; color: #10b981;">💰 Finanzas</button>
       <button class="nav-tab" data-tab="manage" id="manageNavTab" style="display:none; color: #3b82f6;">👥 Gestión</button>
       <button class="nav-tab" data-tab="eval-schedule">📅 Evaluaciones</button>
@@ -306,8 +306,7 @@ window.PremiumModal = {
 };
 </script>
 
-  <script src="/public/js/admin.js?v=13"></script>
+  <script>document.write('<script src="/public/js/admin.js?v=' + Date.now() + '" defer><\/script>');</script>
   <script src="/public/js/app.js?v=14"></script>
 </body>
 </html>
-

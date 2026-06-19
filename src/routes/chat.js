@@ -111,6 +111,7 @@ module.exports = function (app) {
 
         // Inject Profile
         MINERD_SYSTEM_PROMPT += profileBlock;
+        MINERD_SYSTEM_PROMPT += `\n\n=== REGLA: VIGILANTE RECOLECTOR (PERFIL) ===\nSi el profesor menciona su nombre, grado, área escolar o centro educativo en la conversación, DEBES incluir esta etiqueta oculta al final de tu respuesta: [UPDATE_PROFILE: {"name":"...", "grade":"...", "area":"...", "school":"..."}]. Si menciona un gusto o preferencia de cómo le gustan las cosas, usa [MEMORIA: ...].`;
 
         if (fRes && fRes.ok) {
             const fData = await fRes.json();

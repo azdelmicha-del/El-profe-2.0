@@ -58,10 +58,7 @@ window.initAdminPanel = function() {
   document.getElementById('adminTabConfig')?.addEventListener('click', () => switchAdminTab('adminTabConfig', 'adminPromptView', loadAdminPrompts));
   document.getElementById('adminTabFormats')?.addEventListener('click', () => switchAdminTab('adminTabFormats', 'adminFormatView', loadAdminFormats));
   document.getElementById('adminTabKnowledge')?.addEventListener('click', () => switchAdminTab('adminTabKnowledge', 'adminKnowledgeView', window.loadKnowledgeItems));
-  document.getElementById('adminTabMonitor')?.addEventListener('click', () => {
-    switchAdminTab('adminTabMonitor', 'adminMonitorView');
-    startSystemMonitor();
-  });
+
   document.getElementById('adminSearchUsers')?.addEventListener('input', (e) => {
     renderAdminUserList(e.target.value);
     if (document.getElementById('adminManageView').style.display === 'block') {
@@ -227,6 +224,9 @@ window.renderAdminManageTable = function(filter = '') {
     tr.innerHTML = `
       <td style="padding:10px;">${u.name || 'Sin nombre'}</td>
       <td>${u.phone}</td>
+      <td style="font-size:11px; color:var(--text-light); max-width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${u.grade || ''}">${u.grade || '-'}</td>
+      <td style="font-size:11px; color:var(--text-light); max-width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${u.area || ''}">${u.area || '-'}</td>
+      <td style="font-size:11px; color:var(--text-light); max-width:100px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${u.school || ''}">${u.school || '-'}</td>
       <td><span style="background:var(--bg-hover); padding:2px 6px; border-radius:4px; font-size:11px;">${u.plan || 'trial'}</span></td>
       <td>${u.plans_count || 0}</td>
       <td>${expiresStr}</td>
@@ -1326,6 +1326,34 @@ window.deleteKnowledge = async function(id) {
    SUPERVISOR PANEL
    ========================================================================= */
 
+window.switchSupTab = function(tab) {
+  const tAgente = document.getElementById('supTabAgente');
+  const tConsole = document.getElementById('supTabConsole');
+  const vAgente = document.getElementById('supervisorAgenteView');
+  const vConsole = document.getElementById('adminMonitorView');
+  
+  if (!tAgente || !tConsole || !vAgente || !vConsole) return;
+  
+  if (tab === 'agente') {
+    tAgente.style.color = 'var(--primary)';
+    tAgente.style.fontWeight = 'bold';
+    tConsole.style.color = 'var(--text-light)';
+    tConsole.style.fontWeight = 'normal';
+    vAgente.style.display = 'block';
+    vConsole.style.display = 'none';
+  } else {
+    tConsole.style.color = 'var(--primary)';
+    tConsole.style.fontWeight = 'bold';
+    tAgente.style.color = 'var(--text-light)';
+    tAgente.style.fontWeight = 'normal';
+    vAgente.style.display = 'none';
+    vConsole.style.display = 'flex';
+    if (typeof window.startSystemMonitor === 'function') {
+      window.startSystemMonitor();
+    }
+  }
+};
+
 window.initSupervisorPanel = async function() {
   await window.loadSupervisorLogs();
   
@@ -1357,10 +1385,12 @@ window.initSupervisorPanel = async function() {
         else alert('Reglas guardadas exitosamente.');
       } catch (err) {
         if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Error guardando reglas');
-        else alert('Error guardando reglas');
       }
     });
   }
+
+  // Activar la vista del agente por defecto al abrir el panel
+  window.switchSupTab('agente');
 };
 
 window.loadSupervisorLogs = async function() {

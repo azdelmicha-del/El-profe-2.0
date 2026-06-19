@@ -1,44 +1,125 @@
-<div style="padding:20px; background:var(--bg); color:var(--text); min-height:100vh;">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-    <h2 style="font-size:18px;font-weight:700;">👁️ Supervisor IA</h2>
-    <div style="display:flex; align-items:center; gap:10px;">
-      <span style="font-size:14px; color:var(--text-muted);">Estado del Supervisor:</span>
-      <label class="switch" style="position:relative; display:inline-block; width:40px; height:20px;">
-        <input type="checkbox" id="supervisorToggle" style="opacity:0; width:0; height:0;">
-        <span class="slider round" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:20px;"></span>
-      </label>
+<div style="padding:20px; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; gap:15px; height:100%; box-sizing:border-box;">
+  
+  <div id="supervisorTopMenu" style="display:flex; flex-wrap:wrap; justify-content:flex-start; align-items:center; gap:10px; padding:10px 15px; background:var(--card); border:1px solid var(--border); border-radius:12px; font-size:14px;">
+    <span id="supTabAgente" onclick="window.switchSupTab('agente')" style="cursor:pointer; color:var(--primary); font-weight:bold; transition:color 0.2s;">⚙️ Agente de Calidad IA</span>
+    <span style="color:var(--border); user-select:none;">|</span>
+    <span id="supTabConsole" onclick="window.switchSupTab('console')" style="cursor:pointer; color:var(--text-light); transition:color 0.2s;">🖥️ Consola</span>
+  </div>
+
+  <!-- Agente de Calidad View -->
+  <div id="supervisorAgenteView" style="display:block; flex:1; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:15px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:bold; color:var(--text); margin:0;">⚙️ Agente de Calidad IA</h2>
+        <p style="font-size:13px; color:var(--text-light); margin:5px 0 0 0;">Supervisa y corrige automáticamente las respuestas del Asistente.</p>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; background:var(--card); padding:10px 15px; border-radius:10px; border:1px solid var(--border);">
+        <span style="font-size:14px; font-weight:bold; color:var(--text);">Estado:</span>
+        <label class="switch" style="position:relative; display:inline-block; width:40px; height:20px; margin:0;">
+          <input type="checkbox" id="supervisorToggle" style="opacity:0; width:0; height:0;">
+          <span class="slider round" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:20px;"></span>
+        </label>
+      </div>
+    </div>
+
+    <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3 style="font-size:16px; color:var(--primary);">⚙️ Reglas de Supervisión</h3>
+        <button id="saveSupervisorRulesBtn" style="padding:6px 12px; background:var(--primary); color:white; border:none; border-radius:6px; font-size:12px; cursor:pointer;">Guardar Reglas</button>
+      </div>
+      <p style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Define las reglas absolutas que el Agente de Calidad usará para auditar y castigar los errores del Asistente (ej. "Nunca hables de política", "Usa tono formal").</p>
+      <textarea id="supervisorRulesInput" style="width:100%; height:150px; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:13px; resize:vertical;" placeholder="Escribe aquí las reglas absolutas que debe auditar el agente..." oninput="document.getElementById('countSupervisor').innerText = this.value.length + ' / 4000'"></textarea>
+      <div style="text-align:right; font-size:10px; color:var(--text-muted); margin-top:3px;" id="countSupervisor">0 / 4000</div>
+    </div>
+
+    <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px;">
+      <h3 style="font-size:16px; margin-bottom:15px; color:#f59e0b;">Historial de Correcciones</h3>
+      <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Aquí se muestran los casos donde el Agente de Calidad IA intervino para corregir un borrador del Asistente antes de ser enviado al profesor.</p>
+      
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px;" id="supervisorLogsTable">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border); text-align:left;">
+              <th style="padding:10px; color:var(--text-muted);">Fecha</th>
+              <th style="padding:10px; color:var(--text-muted);">Usuario</th>
+              <th style="padding:10px; color:var(--text-muted);">Petición</th>
+              <th style="padding:10px; color:var(--text-muted);">Borrador Original</th>
+              <th style="padding:10px; color:var(--text-muted);">Corrección (Enviada)</th>
+            </tr>
+          </thead>
+          <tbody id="supervisorLogsBody">
+            <tr><td colspan="5" style="text-align:center; padding:20px;">Cargando registros...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-      <h3 style="font-size:16px; color:var(--primary);">⚙️ Reglas de Supervisión</h3>
-      <button id="saveSupervisorRulesBtn" style="padding:6px 12px; background:var(--primary); color:white; border:none; border-radius:6px; font-size:12px; cursor:pointer;">Guardar Reglas</button>
+  <!-- Consola View -->
+  <div id="adminMonitorView" style="display:none; flex:1; padding:0; overflow-y:hidden; flex-direction:column; gap:15px; height:100%; box-sizing:border-box;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; border-bottom:1px solid var(--border); padding-bottom:15px;">
+      <div>
+        <h2 style="font-size:18px;font-weight:bold; color:var(--text); margin:0;">🖥️ Consola e Infraestructura</h2>
+        <p style="font-size:13px; color:var(--text-light); margin:5px 0 0 0;">Monitoreo en tiempo real del servidor y base de datos.</p>
+      </div>
+      <div style="display:flex; background:var(--card); border:1px solid var(--border); padding:4px; border-radius:8px; gap:2px;">
+        <button id="btnMonitorServer" onclick="switchMonitorTab('server')" style="padding:6px 16px; border-radius:6px; border:none; background:var(--primary); color:white; cursor:pointer; font-weight:bold; font-size:13px; transition:all 0.2s;">Servidor</button>
+        <button id="btnMonitorDb" onclick="switchMonitorTab('db')" style="padding:6px 16px; border-radius:6px; border:none; background:transparent; color:var(--text-light); cursor:pointer; font-weight:bold; font-size:13px; transition:all 0.2s;">Base de Datos</button>
+      </div>
     </div>
-    <p style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">Define las reglas absolutas que el Supervisor usará para auditar y castigar los errores del Asistente (ej. "Nunca hables de política", "Usa tono formal").</p>
-    <textarea id="supervisorRulesInput" style="width:100%; height:150px; padding:10px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); font-size:13px; resize:vertical;" placeholder="Escribe aquí las reglas absolutas que debe auditar el supervisor..." oninput="document.getElementById('countSupervisor').innerText = this.value.length + ' / 4000'"></textarea>
-    <div style="text-align:right; font-size:10px; color:var(--text-muted); margin-top:3px;" id="countSupervisor">0 / 4000</div>
-  </div>
-
-  <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px;">
-    <h3 style="font-size:16px; margin-bottom:15px; color:#f59e0b;">Historial de Correcciones</h3>
-    <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Aquí se muestran los casos donde el Supervisor IA intervino para corregir un borrador del Asistente antes de ser enviado al profesor.</p>
     
-    <div style="overflow-x:auto;">
-      <table style="width:100%; border-collapse:collapse; font-size:13px;" id="supervisorLogsTable">
-        <thead>
-          <tr style="border-bottom:1px solid var(--border); text-align:left;">
-            <th style="padding:10px; color:var(--text-muted);">Fecha</th>
-            <th style="padding:10px; color:var(--text-muted);">Usuario</th>
-            <th style="padding:10px; color:var(--text-muted);">Petición</th>
-            <th style="padding:10px; color:var(--text-muted);">Borrador Original</th>
-            <th style="padding:10px; color:var(--text-muted);">Corrección (Enviada)</th>
-          </tr>
-        </thead>
-        <tbody id="supervisorLogsBody">
-          <tr><td colspan="5" style="text-align:center; padding:20px;">Cargando registros...</td></tr>
-        </tbody>
-      </table>
+    <!-- Server View -->
+    <div id="monitorServerSubView" style="display:flex; flex-direction:column; gap:15px; flex:1; overflow:hidden;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+        <div style="background:var(--card); padding:15px; border-radius:8px; border:1px solid var(--border);">
+          <h4 style="color:var(--text-light); font-size:12px; margin-bottom:5px;">Uso de RAM</h4>
+          <div style="width:100%; height:10px; background:var(--bg); border-radius:5px; overflow:hidden;">
+            <div id="monitorRamBar" style="height:100%; width:0%; background:#8b5cf6; transition:width 0.5s;"></div>
+          </div>
+          <div id="monitorRamText" style="font-size:12px; margin-top:5px; text-align:right;">0%</div>
+        </div>
+        <div style="background:var(--card); padding:15px; border-radius:8px; border:1px solid var(--border);">
+          <h4 style="color:var(--text-light); font-size:12px; margin-bottom:5px;">Carga de CPU (Aprox)</h4>
+          <div style="width:100%; height:10px; background:var(--bg); border-radius:5px; overflow:hidden;">
+            <div id="monitorCpuBar" style="height:100%; width:0%; background:#f59e0b; transition:width 0.5s;"></div>
+          </div>
+          <div id="monitorCpuText" style="font-size:12px; margin-top:5px; text-align:right;">0%</div>
+        </div>
+      </div>
+
+      <div id="adminTerminal" style="flex:1; background:#0f172a; border-radius:8px; padding:15px; overflow-y:auto; font-family:'Courier New', Courier, monospace; font-size:13px; color:#e2e8f0; border:1px solid #334155; box-shadow:inset 0 0 10px rgba(0,0,0,0.5);">
+        <div style="color:#10b981;">> Inicializando Consola Planixa v5...</div>
+        <div style="color:#64748b;">> Esperando conexión SSE...</div>
+      </div>
+    </div>
+
+    <!-- DB View -->
+    <div id="monitorDbSubView" style="display:none; flex-direction:column; gap:20px; flex:1; overflow-y:auto;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
+        <div style="background:var(--card); padding:20px; border-radius:8px; border:1px solid var(--border); text-align:center;">
+          <h4 style="color:var(--text-light); font-size:13px; margin-bottom:5px;">Tamaño de Almacenamiento</h4>
+          <div id="dbStorageSize" style="font-size:28px; font-weight:bold; color:var(--primary);">Cargando...</div>
+        </div>
+        <div style="background:var(--card); padding:20px; border-radius:8px; border:1px solid var(--border); text-align:center;">
+          <h4 style="color:var(--text-light); font-size:13px; margin-bottom:5px;">Tamaño de Datos (Crudos)</h4>
+          <div id="dbDataSize" style="font-size:28px; font-weight:bold; color:var(--accent);">Cargando...</div>
+        </div>
+        <div style="background:var(--card); padding:20px; border-radius:8px; border:1px solid var(--border); text-align:center;">
+          <h4 style="color:var(--text-light); font-size:13px; margin-bottom:5px;">Documentos (Objetos)</h4>
+          <div id="dbObjects" style="font-size:28px; font-weight:bold; color:#10b981;">Cargando...</div>
+        </div>
+        <div style="background:var(--card); padding:20px; border-radius:8px; border:1px solid var(--border); text-align:center;">
+          <h4 style="color:var(--text-light); font-size:13px; margin-bottom:5px;">Colecciones</h4>
+          <div id="dbCollections" style="font-size:28px; font-weight:bold; color:#f59e0b;">Cargando...</div>
+        </div>
+      </div>
+      
+      <div style="background:var(--card); padding:20px; border-radius:8px; border:1px solid var(--border);">
+         <h4 style="color:var(--text); font-size:15px; margin-bottom:10px;">Detalles Técnicos</h4>
+         <ul id="dbExtraStats" style="color:var(--text-light); font-size:13px; line-height:1.8;">
+           <li>Cargando más estadísticas...</li>
+         </ul>
+      </div>
     </div>
   </div>
 </div>
@@ -77,59 +158,3 @@ input:checked + .slider:before {
 }
 </style>
 
-<script>
-async function loadSupervisorLogs() {
-  try {
-    const res = await api('GET', '/api/admin/supervisor_logs');
-    const toggle = document.getElementById('supervisorToggle');
-    if (toggle) toggle.checked = res.enabled;
-    const rulesInput = document.getElementById('supervisorRulesInput');
-    if (rulesInput) rulesInput.value = res.rules || '';
-    
-    const tbody = document.getElementById('supervisorLogsBody');
-    if (!res.logs || res.logs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:var(--text-muted);">No hay correcciones registradas aún. El Asistente lo ha hecho todo perfecto o el supervisor está apagado.</td></tr>';
-      return;
-    }
-    
-    tbody.innerHTML = res.logs.map(log => `
-      <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:10px;">${new Date(log.date).toLocaleString()}</td>
-        <td style="padding:10px;">${log.userId || 'Desconocido'}</td>
-        <td style="padding:10px;" class="log-cell" title="${log.userRequest.replace(/"/g, '&quot;')}">${log.userRequest}</td>
-        <td style="padding:10px; color:#ef4444;" class="log-cell" title="${log.draftResponse.replace(/"/g, '&quot;')}">${log.draftResponse}</td>
-        <td style="padding:10px; color:#10b981;" class="log-cell" title="${log.correctedResponse.replace(/"/g, '&quot;')}">${log.correctedResponse}</td>
-      </tr>
-    `).join('');
-    
-  } catch (err) {
-    console.error("Error cargando supervisor", err);
-    document.getElementById('supervisorLogsBody').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:red;">Error cargando registros.</td></tr>';
-  }
-}
-
-document.getElementById('supervisorToggle')?.addEventListener('change', async (e) => {
-  const enabled = e.target.checked;
-  try {
-    await api('POST', '/api/admin/settings/supervisor', { enabled });
-    alert(`Supervisor IA ${enabled ? 'Activado' : 'Desactivado'}`);
-  } catch (err) {
-    alert('Error guardando configuración');
-    e.target.checked = !enabled;
-  }
-});
-
-document.getElementById('saveSupervisorRulesBtn')?.addEventListener('click', async () => {
-  const rules = document.getElementById('supervisorRulesInput').value;
-  try {
-    await api('POST', '/api/admin/settings/supervisor', { rules });
-    if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Reglas guardadas exitosamente.');
-    else alert('Reglas guardadas exitosamente.');
-  } catch (err) {
-    if (typeof PremiumModal !== 'undefined') await PremiumModal.alert('Error guardando reglas');
-    else alert('Error guardando reglas');
-  }
-});
-
-loadSupervisorLogs();
-</script>
