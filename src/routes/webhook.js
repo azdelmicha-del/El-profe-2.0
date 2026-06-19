@@ -238,7 +238,7 @@ module.exports = function (app) {
                 reply = '⚠️ Ocurrió un error en el Orquestador.';
 
                 const orqModel = selectedPrompt.model || 'gpt-4o-mini';
-                req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#8b5cf6', title: 'Consultando Orquestador', details: `Modelo: ${orqModel}. Enviando contexto y herramientas...` });
+                req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#8b5cf6', title: 'Flujo del Orquestador (Jefe)', details: 'Planixa Principal: Identidad (Prompt Principal) + Perfil del Profesor (Grado/Área) + Base de Conocimientos MINERD (Reglas) + Menú de Especialistas (con sus plantillas ancladas) + Catálogo General de Plantillas -> Interactúa con el usuario -> Recolecta datos -> Planixa Principal: ordena a Especialista (Pasa ID + Instrucciones)' });
                 const orquestadorRes = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
@@ -301,7 +301,7 @@ module.exports = function (app) {
                                     dynamicInstructions += '\n\nIMPORTANTE: ¡Si no incluyes el bloque ```json con los datos, el sistema fallará y el profesor no recibirá su documento! NO DEVUELVAS TEXTO DE RELLENO, SOLO EL INFORME Y EL JSON.';
 
                                     const specModel = specPromptDoc.model || 'gpt-4o-mini';
-                                    req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: 'Ejecutando Modelo', details: `Procesando con ${specModel}...` });
+                                    req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: `Flujo del Especialista (${specPromptDoc.name})`, details: `(Datos Recibidos + Accediendo a "Plantillas" + Datos de Plantilla "${plantillaNombre || 'X'}" Extraídos + Accediendo a "Conocimientos Planixa" + Conocimientos de Planixa Extraídos + Inyectando Datos en Plantilla "${plantillaNombre || 'X'}" + Enviando Archivo a Planixa Principal)` });
                                     const specRes = await fetch('https://api.openai.com/v1/chat/completions', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },

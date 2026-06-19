@@ -1,12 +1,10 @@
-    <div class="admin-layout" style="display:flex; flex-direction:column; height:100%; gap:15px; padding:15px; box-sizing:border-box;">
+<div class="admin-layout" style="display:flex; flex-direction:column; height:100%; gap:15px; padding:15px; box-sizing:border-box;">
       
       <!-- Top Horizontal Menu -->
       <div id="adminTopMenu" style="display:flex; flex-wrap:wrap; justify-content:flex-start; align-items:center; gap:10px; padding:10px 15px; background:var(--bg); border:1px solid var(--border); border-radius:12px; font-size:14px;">
         <span id="adminTabDash" style="cursor:pointer; color:var(--primary); font-weight:bold; transition:color 0.2s;">📊 Dashboard</span>
         <span style="color:var(--border); user-select:none;">|</span>
         <span id="adminTabUsers" style="cursor:pointer; color:var(--text-light); transition:color 0.2s;">👀 Monitoreo</span>
-        <span style="color:var(--border); user-select:none;">|</span>
-        <span id="adminTabManage" style="cursor:pointer; color:var(--text-light); transition:color 0.2s;">👥 Gestión</span>
         <span style="color:var(--border); user-select:none;">|</span>
         <span id="adminTabBroadcast" style="cursor:pointer; color:var(--text-light); transition:color 0.2s;">📢 Difusión</span>
         <span style="color:var(--border); user-select:none;">|</span>
@@ -156,22 +154,7 @@
             <button id="sendBroadcastBtn" style="align-self:flex-end; padding:10px 20px; background:#f59e0b; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Enviar Masivo 🚀</button>
           </div>
         </div>
-        <div id="adminManageView" style="display:none; flex:1; padding:20px; overflow-y:auto;">
-          <input type="text" id="searchManageInput" placeholder="🔍 Buscar usuarios por nombre o teléfono..." style="width:100%; padding:10px 15px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; margin-bottom:15px;" oninput="renderAdminManageTable(this.value)">
-          <table style="width:100%; border-collapse:collapse; font-size:13px;">
-            <thead>
-              <tr style="border-bottom:1px solid var(--border); text-align:left;">
-                <th style="padding:10px;">Nombre</th>
-                <th>Teléfono</th>
-                <th>Plan</th>
-                <th>Uso</th>
-                <th>Vence</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="adminManageTableBody"></tbody>
-          </table>
-        </div>
+
         <div id="adminOrchestratorView" style="display:none; flex:1; padding:20px; overflow-y:auto; flex-direction:column; gap:15px;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>

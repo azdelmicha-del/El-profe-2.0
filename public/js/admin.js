@@ -73,6 +73,26 @@ window.initAdminPanel = function() {
     document.getElementById('adminEditModal').style.display = 'none';
   });
 
+  document.getElementById('adminEditPlan')?.addEventListener('change', (e) => {
+    const plan = e.target.value;
+    const expiresInput = document.getElementById('adminEditExpires');
+    if (!expiresInput) return;
+    
+    if (['trial', 'exempt', 'lifetime', 'free'].includes(plan)) {
+      expiresInput.value = '';
+      return;
+    }
+
+    const d = new Date();
+    if (plan === '1_week') d.setDate(d.getDate() + 7);
+    else if (plan === '1_month') d.setMonth(d.getMonth() + 1);
+    else if (plan === '3_months') d.setMonth(d.getMonth() + 3);
+    else if (plan === '6_months') d.setMonth(d.getMonth() + 6);
+    else if (plan === '1_year') d.setFullYear(d.getFullYear() + 1);
+    
+    expiresInput.value = d.toISOString().split('T')[0];
+  });
+
   document.getElementById('adminEditSaveBtn')?.addEventListener('click', async () => {
     const userId = document.getElementById('adminEditUserId').value;
     const name = document.getElementById('adminEditName').value.trim();
@@ -140,7 +160,7 @@ window.initAdminPanel = function() {
 
 async function loadAdminUsers() {
   try {
-    const res = await fetch('/api/admin/users', {
+    const res = await fetch('/api/admin/users?t=' + Date.now(), {
       headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') }
     });
     const data = await res.json();
@@ -148,8 +168,8 @@ async function loadAdminUsers() {
     adminUsers = data.users || [];
     renderAdminUserList();
     updateAdminDashboard();
-    if (document.getElementById('adminManageView').style.display === 'block') {
-      renderAdminManageTable();
+    if (document.getElementById('managePanel') && document.getElementById('managePanel').style.display === 'flex') {
+      window.renderAdminManageTable();
     }
   } catch (err) {
     console.error('Error loading admin users', err);
@@ -185,7 +205,7 @@ function renderAdminUserList(filter = '') {
   });
 }
 
-function renderAdminManageTable(filter = '') {
+window.renderAdminManageTable = function(filter = '') {
   const tbody = document.getElementById('adminManageTableBody');
   if (!tbody) return;
   tbody.innerHTML = '';
@@ -905,7 +925,7 @@ async function sendAdminAiMessage() {
 
 async function loadAdminDashboard() {
   try {
-    const res = await fetch('/api/admin/dashboard', {
+    const res = await fetch('/api/admin/dashboard?t=' + Date.now(), {
       headers: { 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') }
     });
     if (res.ok) {

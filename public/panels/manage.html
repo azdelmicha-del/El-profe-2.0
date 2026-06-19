@@ -1,0 +1,23 @@
+<div style="padding:20px; box-sizing:border-box; height:100%; display:flex; flex-direction:column; gap:20px;">
+  <h2 style="font-size:18px; font-weight:bold; color: #3b82f6;">👥 Gestión de Usuarios</h2>
+  <p style="font-size:14px; color:var(--text-light); margin-bottom:10px;">
+    Administra los planes, contraseñas y accesos de todos los usuarios de la plataforma.
+  </p>
+
+  <div style="flex:1; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; overflow-y:auto;">
+    <input type="text" id="searchManageInput" placeholder="🔍 Buscar usuarios por nombre o teléfono..." style="width:100%; padding:10px 15px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; margin-bottom:15px;" oninput="renderAdminManageTable(this.value)">
+    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border); text-align:left;">
+          <th style="padding:10px;">Nombre</th>
+          <th>Teléfono</th>
+          <th>Plan</th>
+          <th>Uso</th>
+          <th>Vence</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="adminManageTableBody"></tbody>
+    </table>
+  </div>
+</div>

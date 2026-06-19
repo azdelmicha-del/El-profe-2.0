@@ -107,9 +107,10 @@ async function enterApp() {
       $('adminNavTab').style.display = 'inline-block';
       if ($('supervisorNavTab')) $('supervisorNavTab').style.display = 'inline-block';
       if ($('financeNavTab')) $('financeNavTab').style.display = 'inline-block';
+      if ($('manageNavTab')) $('manageNavTab').style.display = 'inline-block';
       
       document.querySelectorAll('.nav-tab').forEach(t => {
-        const allowed = ['admin', 'supervisor', 'finance'];
+        const allowed = ['admin', 'supervisor', 'finance', 'manage'];
         if (!allowed.includes(t.dataset.tab)) t.style.display = 'none';
       });
       if ($('topNewBtn')) $('topNewBtn').style.display = 'none';
@@ -682,7 +683,7 @@ async function switchTab(tab) {
     t.style.fontWeight = '';
     t.style.borderBottomColor = '';
   });
-  const panels = ['chat-main', 'adminPanel', 'calendarPanel', 'templatesPanel', 'studentsPanel', 'schedulePanel', 'annualPanel', 'statsPanel', 'remindersPanel', 'customTemplatesPanel', 'journalPanel', 'competenciasPanel', 'clientsPanel', 'supervisorPanel', 'financePanel', 'knowledgePanel', 'evalSchedulePanel'];
+  const panels = ['chat-main', 'adminPanel', 'calendarPanel', 'templatesPanel', 'studentsPanel', 'schedulePanel', 'annualPanel', 'statsPanel', 'remindersPanel', 'customTemplatesPanel', 'journalPanel', 'competenciasPanel', 'clientsPanel', 'supervisorPanel', 'financePanel', 'managePanel', 'knowledgePanel', 'evalSchedulePanel'];
   const tabLower = tab.toLowerCase();
   for (const id of panels) {
     const el = $(id);
@@ -691,7 +692,7 @@ async function switchTab(tab) {
     el.classList.remove('active-panel');
     if (id === 'chat-main') continue;
   }
-  if (tab === 'admin' || tab === 'supervisor' || tab === 'finance') {
+  if (tab === 'admin' || tab === 'supervisor' || tab === 'finance' || tab === 'manage') {
     const side = $('aiChatSidepanel'); if (side) side.style.display = 'none';
     const voiceBtn = $('voiceBtn'); if (voiceBtn) voiceBtn.style.display = 'none';
   } else {
@@ -725,6 +726,7 @@ async function switchTab(tab) {
   if (tab === 'journal') loadJournal();
   if (tab === 'competencias') loadCompetencias();
   if (tab === 'evalSchedule') loadEvalSchedule();
+  if (tab === 'manage' && typeof window.renderAdminManageTable === 'function') window.renderAdminManageTable();
 }
 document.querySelectorAll('.nav-tab').forEach(tab => {
   tab.addEventListener('click', () => switchTab(tab.dataset.tab));
