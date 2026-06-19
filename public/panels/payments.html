@@ -1,0 +1,69 @@
+<div style="padding:20px; box-sizing:border-box; height:100%; display:flex; flex-direction:column; gap:20px;">
+  <h2 style="font-size:18px; font-weight:bold; color:var(--text);">💳 Pasarela y Pagos</h2>
+  <p style="font-size:14px; color:var(--text-light); margin-bottom:10px;">
+    Configura tus métodos de pago (PayPal, Azul, Banco) y aprueba las transferencias manuales de los clientes.
+  </p>
+
+  <!-- Navigation Tabs -->
+  <div style="display:flex; gap:10px; border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px;">
+    <button onclick="switchPaymentsTab('settings')" id="payTabSettings" style="padding:8px 15px; border-radius:6px; border:none; background:var(--primary); color:white; font-weight:bold; cursor:pointer;">Configuración API</button>
+    <button onclick="switchPaymentsTab('transfers')" id="payTabTransfers" style="padding:8px 15px; border-radius:6px; border:none; background:var(--bg-hover); color:var(--text); font-weight:bold; cursor:pointer;">Aprobar Transferencias</button>
+  </div>
+
+  <!-- Settings View -->
+  <div id="paymentsSettingsView" style="display:flex; flex-direction:column; gap:20px; flex:1; overflow-y:auto; padding-right:10px;">
+    
+    <!-- Bank Details -->
+    <div style="background:var(--card); padding:20px; border-radius:12px; border:1px solid var(--border);">
+      <h3 style="font-size:15px; color:var(--primary); margin-bottom:10px;">🏦 Cuentas Bancarias</h3>
+      <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px;">Muestra a los clientes esta información cuando seleccionen "Transferencia Bancaria".</p>
+      <textarea id="payBankInfo" style="width:100%; height:100px; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); resize:vertical; font-family:inherit; font-size:13px;" placeholder="Ej: Banco Popular&#10;Cuenta Corriente: 123456789&#10;A nombre de: Juan Perez"></textarea>
+    </div>
+
+    <!-- PayPal -->
+    <div style="background:var(--card); padding:20px; border-radius:12px; border:1px solid var(--border);">
+      <h3 style="font-size:15px; color:#3b82f6; margin-bottom:10px;">🔵 PayPal (Automático)</h3>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <input type="text" id="payPayPalClient" placeholder="PayPal Client ID" style="padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+        <input type="password" id="payPayPalSecret" placeholder="PayPal Secret Key" style="padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+      </div>
+    </div>
+
+    <!-- Azul/Carnet -->
+    <div style="background:var(--card); padding:20px; border-radius:12px; border:1px solid var(--border);">
+      <h3 style="font-size:15px; color:#10b981; margin-bottom:10px;">💳 Azul / Carnet (Proximamente)</h3>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">El módulo para tarjetas locales dominicanas requiere llaves generadas por el banco.</p>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <input type="text" id="payAzulId" placeholder="Merchant ID" style="padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+        <input type="password" id="payAzulAuth" placeholder="Auth Key" style="padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+      </div>
+    </div>
+
+    <button onclick="savePaymentSettings()" style="padding:12px; background:var(--primary); color:white; font-weight:bold; border:none; border-radius:8px; cursor:pointer; width:100%; margin-bottom:20px;">Guardar Configuración</button>
+  </div>
+
+  <!-- Transfers View -->
+  <div id="paymentsTransfersView" style="display:none; flex-direction:column; gap:20px; flex:1; overflow-y:auto;">
+    <div style="background:var(--card); padding:20px; border-radius:12px; border:1px solid var(--border); flex:1;">
+      <h3 style="font-size:15px; margin-bottom:15px; color:#f59e0b;">Transferencias Pendientes de Aprobación</h3>
+      
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border); color:var(--text-light);">
+              <th style="padding:10px;">Fecha</th>
+              <th style="padding:10px;">Cliente (Telf)</th>
+              <th style="padding:10px;">Plan Solicitado</th>
+              <th style="padding:10px;">Ref/Comprobante</th>
+              <th style="padding:10px;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="payTransfersTable">
+            <tr><td colspan="5" style="text-align:center; padding:20px;">Cargando transferencias...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>

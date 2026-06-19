@@ -72,6 +72,7 @@
       <button class="nav-tab" data-tab="competencias">🎯 Competencias</button>
       <button class="nav-tab" data-tab="supervisor" id="supervisorNavTab" style="display:none; color: #f59e0b;">🖥️ Monitor de Sistema</button>
       <button class="nav-tab" data-tab="finance" id="financeNavTab" style="display:none; color: #10b981;">💰 Finanzas</button>
+      <button class="nav-tab" data-tab="payments" id="paymentsNavTab" style="display:none; color: #a855f7;">💳 Pagos</button>
       <button class="nav-tab" data-tab="manage" id="manageNavTab" style="display:none; color: #3b82f6;">👥 Gestión</button>
       <button class="nav-tab" data-tab="eval-schedule">📅 Evaluaciones</button>
       </div>
@@ -105,6 +106,7 @@
         <span id="sidebarUserName" style="font-weight:600;font-size:14px;display:block;"></span>
         <span id="sidebarUserMeta" style="font-size:11px;color:var(--text-light);"></span>
       </div>
+      <button class="logout-btn" id="upgradePlanBtn" onclick="openCheckoutModal()" style="color:#10b981;font-size:11px;font-weight:bold;">💎 Mejorar</button>
       <button class="logout-btn" id="profileBtn" style="color:var(--primary);font-size:11px;">Perfil</button>
       <button class="logout-btn" id="adminPanelBtn" style="color:var(--primary);display:none;font-size:11px;">Admin</button>
       <button class="logout-btn" id="logoutBtn" style="font-size:11px;">Salir</button>
@@ -152,6 +154,7 @@
   <div id="competenciasPanel" class="panel-content" data-panel="competencias"></div>
   <div id="supervisorPanel" class="panel-content" data-panel="supervisor"></div>
   <div id="financePanel" class="panel-content" data-panel="finance"></div>
+  <div id="paymentsPanel" class="panel-content" data-panel="payments"></div>
   <div id="managePanel" class="panel-content" data-panel="manage"></div>
   <div id="evalSchedulePanel" class="panel-content" data-panel="eval-schedule"></div>
 

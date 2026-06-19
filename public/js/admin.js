@@ -1572,3 +1572,99 @@ window.fetchDbStats = async function() {
     document.getElementById('dbDataSize').innerText = 'Error';
   }
 };
+
+// ==========================================
+// PAGOS Y PASARELAS
+// ==========================================
+window.switchPaymentsTab = function(tab) {
+  document.getElementById('paymentsSettingsView').style.display = tab === 'settings' ? 'flex' : 'none';
+  document.getElementById('paymentsTransfersView').style.display = tab === 'transfers' ? 'flex' : 'none';
+  
+  document.getElementById('payTabSettings').style.background = tab === 'settings' ? 'var(--primary)' : 'var(--bg-hover)';
+  document.getElementById('payTabSettings').style.color = tab === 'settings' ? 'white' : 'var(--text)';
+  
+  document.getElementById('payTabTransfers').style.background = tab === 'transfers' ? 'var(--primary)' : 'var(--bg-hover)';
+  document.getElementById('payTabTransfers').style.color = tab === 'transfers' ? 'white' : 'var(--text)';
+
+  if (tab === 'settings') loadPaymentSettings();
+  if (tab === 'transfers') loadPaymentTransfers();
+};
+
+window.loadPaymentSettings = async function() {
+  try {
+    const res = await api('GET', '/api/payments/settings');
+    if (!res.success) return;
+    const data = res.data || {};
+    
+    document.getElementById('payBankInfo').value = data.bank?.info || '';
+    document.getElementById('payPayPalClient').value = data.paypal?.client_id || '';
+    document.getElementById('payPayPalSecret').value = data.paypal?.secret || '';
+    document.getElementById('payAzulId').value = data.azul?.merchant_id || '';
+    document.getElementById('payAzulAuth').value = data.azul?.auth_key || '';
+  } catch (err) {
+    console.error('Error loading payment settings', err);
+  }
+};
+
+window.savePaymentSettings = async function() {
+  const payload = {
+    bank: { info: document.getElementById('payBankInfo').value },
+    paypal: {
+      client_id: document.getElementById('payPayPalClient').value,
+      secret: document.getElementById('payPayPalSecret').value
+    },
+    azul: {
+      merchant_id: document.getElementById('payAzulId').value,
+      auth_key: document.getElementById('payAzulAuth').value
+    }
+  };
+
+  try {
+    const res = await api('POST', '/api/payments/settings', payload);
+    if (res.success) alert('Configuración guardada exitosamente');
+    else alert('Error: ' + res.message);
+  } catch (err) {
+    alert('Error de conexión');
+  }
+};
+
+window.loadPaymentTransfers = async function() {
+  try {
+    const res = await api('GET', '/api/payments/transfers');
+    const tbody = document.getElementById('payTransfersTable');
+    if (!res.success || !res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No hay transferencias pendientes.</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = res.data.map(p => `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:10px;">${new Date(p.created_at).toLocaleString()}</td>
+        <td style="padding:10px;">${p.phone}</td>
+        <td style="padding:10px; font-weight:bold; color:var(--primary);">${p.plan_id.toUpperCase()} - $${p.amount}</td>
+        <td style="padding:10px;">${p.reference}</td>
+        <td style="padding:10px; display:flex; gap:5px;">
+          <button onclick="approveTransfer('${p._id}', 'approve')" style="padding:5px 10px; background:#10b981; color:white; border:none; border-radius:4px; cursor:pointer;">Aprobar</button>
+          <button onclick="approveTransfer('${p._id}', 'reject')" style="padding:5px 10px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer;">Rechazar</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Error loading transfers', err);
+  }
+};
+
+window.approveTransfer = async function(id, action) {
+  if (!confirm('¿Seguro que quieres ' + (action==='approve'?'APROBAR y activar el plan':'RECHAZAR') + '?')) return;
+  try {
+    const res = await api('POST', '/api/payments/transfers/action', { payment_id: id, action });
+    if (res.success) {
+      alert(res.message);
+      loadPaymentTransfers();
+    } else {
+      alert(res.message);
+    }
+  } catch(e) {
+    alert('Error');
+  }
+};

@@ -77,6 +77,7 @@ require('./routes/import')(app);
 require('./routes/versions')(app);
 require('./routes/calendar')(app);
 require('./routes/portal')(app);
+require('./routes/payments')(app);
 
 /* ── START ── */
 async function start() {

@@ -107,10 +107,11 @@ async function enterApp() {
       $('adminNavTab').style.display = 'inline-block';
       if ($('supervisorNavTab')) $('supervisorNavTab').style.display = 'inline-block';
       if ($('financeNavTab')) $('financeNavTab').style.display = 'inline-block';
+      if ($('paymentsNavTab')) $('paymentsNavTab').style.display = 'inline-block';
       if ($('manageNavTab')) $('manageNavTab').style.display = 'inline-block';
       
       document.querySelectorAll('.nav-tab').forEach(t => {
-        const allowed = ['admin', 'supervisor', 'finance', 'manage'];
+        const allowed = ['admin', 'supervisor', 'finance', 'payments', 'manage'];
         if (!allowed.includes(t.dataset.tab)) t.style.display = 'none';
       });
       if ($('topNewBtn')) $('topNewBtn').style.display = 'none';
@@ -683,7 +684,7 @@ async function switchTab(tab) {
     t.style.fontWeight = '';
     t.style.borderBottomColor = '';
   });
-  const panels = ['chat-main', 'adminPanel', 'calendarPanel', 'templatesPanel', 'studentsPanel', 'schedulePanel', 'annualPanel', 'statsPanel', 'remindersPanel', 'customTemplatesPanel', 'journalPanel', 'competenciasPanel', 'clientsPanel', 'supervisorPanel', 'financePanel', 'managePanel', 'knowledgePanel', 'evalSchedulePanel'];
+  const panels = ['chat-main', 'adminPanel', 'calendarPanel', 'templatesPanel', 'studentsPanel', 'schedulePanel', 'annualPanel', 'statsPanel', 'remindersPanel', 'customTemplatesPanel', 'journalPanel', 'competenciasPanel', 'clientsPanel', 'supervisorPanel', 'financePanel', 'managePanel', 'knowledgePanel', 'evalSchedulePanel', 'paymentsPanel'];
   const tabLower = tab.toLowerCase();
   for (const id of panels) {
     const el = $(id);
@@ -692,7 +693,7 @@ async function switchTab(tab) {
     el.classList.remove('active-panel');
     if (id === 'chat-main') continue;
   }
-  if (tab === 'admin' || tab === 'supervisor' || tab === 'finance' || tab === 'manage') {
+  if (tab === 'admin' || tab === 'supervisor' || tab === 'finance' || tab === 'manage' || tab === 'payments') {
     const side = $('aiChatSidepanel'); if (side) side.style.display = 'none';
     const voiceBtn = $('voiceBtn'); if (voiceBtn) voiceBtn.style.display = 'none';
   } else {
@@ -1611,3 +1612,130 @@ if (token && userId) {
 } else {
   $('authOverlay').style.display = 'flex';
 }
+
+/* ── PAGOS Y CHECKOUT (CLIENTE) ── */
+let checkoutPlansData = [];
+let checkoutSelectedPlan = null;
+let publicPaymentSettings = {};
+
+window.openCheckoutModal = async function() {
+  const modal = $('checkoutModal');
+  if (modal) {
+    modal.style.display = 'block';
+    switchCheckoutTab('plans');
+    
+    // Cargar planes
+    const container = $('chkPlansContainer');
+    container.innerHTML = '<div style="text-align:center; grid-column:1/-1;">Cargando planes seguros...</div>';
+    
+    try {
+      const res = await api('GET', '/api/payments/public');
+      if (res.success) {
+        checkoutPlansData = res.plans;
+        publicPaymentSettings = res.gateways;
+        
+        container.innerHTML = checkoutPlansData.map(p => `
+          <div style="border:1px solid var(--border); border-radius:12px; padding:20px; cursor:pointer; transition:all 0.2s;" class="plan-card" onclick="selectCheckoutPlan('${p.id}')">
+            <h3 style="font-size:16px; margin:0 0 5px 0;">${p.name}</h3>
+            <div style="font-size:24px; font-weight:900; color:var(--primary); margin-bottom:10px;">
+              $${p.price} <span style="font-size:12px; font-weight:normal; color:var(--text-light);">${p.currency}</span>
+            </div>
+            <p style="font-size:13px; color:var(--text-muted); margin:0;">${p.desc}</p>
+          </div>
+        `).join('');
+      } else {
+        container.innerHTML = '<div style="color:red; grid-column:1/-1;">Error cargando planes</div>';
+      }
+    } catch(e) {
+      container.innerHTML = '<div style="color:red; grid-column:1/-1;">Error de conexión</div>';
+    }
+  }
+};
+
+window.closeCheckoutModal = function() {
+  const modal = $('checkoutModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.switchCheckoutTab = function(tab) {
+  $('chkViewPlans').style.display = tab === 'plans' ? 'flex' : 'none';
+  $('chkViewPayment').style.display = tab === 'payment' ? 'flex' : 'none';
+  
+  $('chkTabPlans').style.background = tab === 'plans' ? 'var(--primary)' : 'var(--bg-hover)';
+  $('chkTabPlans').style.color = tab === 'plans' ? 'white' : 'var(--text-muted)';
+  
+  $('chkTabPayment').style.background = tab === 'payment' ? 'var(--primary)' : 'var(--bg-hover)';
+  $('chkTabPayment').style.color = tab === 'payment' ? 'white' : 'var(--text-muted)';
+};
+
+window.selectCheckoutPlan = function(planId) {
+  checkoutSelectedPlan = checkoutPlansData.find(p => p.id === planId);
+  if (!checkoutSelectedPlan) return;
+  
+  $('chkSelectedPlanName').innerText = checkoutSelectedPlan.name;
+  $('chkSelectedPlanPrice').innerText = `$${checkoutSelectedPlan.price} ${checkoutSelectedPlan.currency}`;
+  
+  switchCheckoutTab('payment');
+  $('bankTransferForm').style.display = 'none';
+
+  // Mostrar los botones adecuados
+  $('btnPayBank').style.display = 'flex';
+  
+  // Próximamente integración de Azul UI
+  if (publicPaymentSettings.azul_active || publicPaymentSettings.carnet_active) {
+    $('btnPayAzul').style.display = 'flex';
+  } else {
+    $('btnPayAzul').style.display = 'flex'; // Display anyway but mocked
+  }
+  
+  // Paypal nativo si hay client id
+  const ppContainer = $('paypal-button-container');
+  if (publicPaymentSettings.paypal_client_id && typeof paypal !== 'undefined') {
+    ppContainer.style.display = 'block';
+    ppContainer.innerHTML = '';
+    paypal.Buttons({
+      createOrder: function(data, actions) {
+        return actions.order.create({
+          purchase_units: [{ amount: { value: checkoutSelectedPlan.price } }]
+        });
+      },
+      onApprove: function(data, actions) {
+        return actions.order.capture().then(function(details) {
+          alert('Pago con PayPal completado. Contacta soporte para activar tu plan por ahora.');
+          // En versión real: Enviar details a /api/payments/paypal/webhook
+          closeCheckoutModal();
+        });
+      }
+    }).render('#paypal-button-container');
+  } else {
+    ppContainer.style.display = 'none';
+  }
+};
+
+window.showBankTransferForm = function() {
+  $('bankTransferForm').style.display = 'block';
+  $('bankInfoDisplay').innerText = publicPaymentSettings.bank_info || 'No hay información bancaria configurada en el sistema.';
+};
+
+window.submitBankTransfer = async function() {
+  const ref = $('bankTransferRef').value.trim();
+  if (!ref) return alert('Debes escribir un número de referencia o comprobante');
+  if (!checkoutSelectedPlan) return alert('Ningún plan seleccionado');
+  
+  try {
+    const res = await api('POST', '/api/payments/transfer', {
+      plan_id: checkoutSelectedPlan.id,
+      amount: checkoutSelectedPlan.price,
+      reference: ref
+    });
+    
+    if (res.success) {
+      alert(res.message);
+      closeCheckoutModal();
+    } else {
+      alert(res.message);
+    }
+  } catch(e) {
+    alert('Error al enviar solicitud');
+  }
+};

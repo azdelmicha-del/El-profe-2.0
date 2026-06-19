@@ -432,3 +432,70 @@
     </div>
   </div>
 </div>
+
+<!-- Payment/Checkout Modal -->
+<div id="checkoutModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(5px);padding:20px; overflow-y:auto;">
+  <div style="background:var(--card);border-radius:12px;max-width:550px;margin:40px auto;padding:30px;box-shadow:0 20px 60px rgba(0,0,0,0.4);border:1px solid var(--border);">
+    
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="font-size:22px; font-weight:800; color:var(--text);">💎 Suscripción y Planes</h2>
+      <button onclick="closeCheckoutModal()" style="background:none;border:none;font-size:26px;color:var(--text-light);cursor:pointer;line-height:1;">&times;</button>
+    </div>
+
+    <!-- Pestañas del Modal -->
+    <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+      <button onclick="switchCheckoutTab('plans')" id="chkTabPlans" style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--primary); color:white; font-weight:bold; cursor:pointer;">Elegir Plan</button>
+      <button id="chkTabPayment" style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--bg); color:var(--text-muted); font-weight:bold; cursor:not-allowed;">Pagar</button>
+    </div>
+
+    <!-- Vista de Planes -->
+    <div id="chkViewPlans" style="display:flex; flex-direction:column; gap:15px;">
+      <p style="font-size:14px; color:var(--text-light); margin-bottom:10px;">Selecciona el plan que mejor se adapte a tus necesidades para continuar usando Planixa.</p>
+      <div id="chkPlansContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+        <div style="text-align:center; padding:20px; grid-column:1/-1;">Cargando planes...</div>
+      </div>
+    </div>
+
+    <!-- Vista de Pagos -->
+    <div id="chkViewPayment" style="display:none; flex-direction:column; gap:20px;">
+      <div style="background:var(--bg-hover); padding:15px; border-radius:8px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <span style="font-size:12px; color:var(--text-light); text-transform:uppercase; font-weight:bold;">Plan Seleccionado</span>
+          <div id="chkSelectedPlanName" style="font-size:16px; font-weight:bold; color:var(--text);">Plan</div>
+        </div>
+        <div id="chkSelectedPlanPrice" style="font-size:22px; font-weight:900; color:var(--primary);">$0.00</div>
+      </div>
+
+      <h3 style="font-size:14px; color:var(--text-light); margin-bottom:5px;">Elige tu método de pago</h3>
+      
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        
+        <!-- Botones de Pago -->
+        <div id="paypal-button-container" style="display:none; margin-top:10px;"></div>
+        
+        <button id="btnPayBank" onclick="showBankTransferForm()" style="width:100%; padding:15px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:all 0.2s;">
+          <span style="font-size:18px;">🏦</span> Transferencia Bancaria Local
+        </button>
+        
+        <button id="btnPayAzul" onclick="alert('Próximamente')" style="width:100%; padding:15px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:all 0.2s; opacity:0.6;">
+          <span style="font-size:18px;">💳</span> Tarjeta de Crédito / Débito (Próximamente)
+        </button>
+
+      </div>
+
+      <!-- Formulario de Transferencia Oculto -->
+      <div id="bankTransferForm" style="display:none; background:var(--card); padding:20px; border-radius:8px; border:1px dashed var(--border); margin-top:10px;">
+        <h4 style="font-size:14px; color:var(--text); margin-bottom:10px;">Datos Bancarios</h4>
+        <pre id="bankInfoDisplay" style="font-size:13px; color:var(--primary); background:var(--bg); padding:10px; border-radius:6px; white-space:pre-wrap; margin-bottom:15px;">Cargando...</pre>
+        
+        <p style="font-size:12px; color:var(--text-light); margin-bottom:10px;">Por favor, realiza el depósito y escribe aquí el número de referencia, comprobante o banco desde el que transferiste:</p>
+        <input type="text" id="bankTransferRef" placeholder="Ej: Ref 123456 - Banreservas" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); margin-bottom:15px;">
+        
+        <button onclick="submitBankTransfer()" style="width:100%; padding:12px; background:#10b981; color:white; font-weight:bold; border:none; border-radius:8px; cursor:pointer;">Enviar para Aprobación</button>
+      </div>
+
+      <button onclick="switchCheckoutTab('plans')" style="background:none; border:none; color:var(--text-muted); font-size:13px; cursor:pointer; margin-top:10px; text-decoration:underline;">← Volver a elegir plan</button>
+    </div>
+
+  </div>
+</div>
