@@ -260,13 +260,20 @@ Eres el encargado de interactuar con el profesor y coordinar el trabajo.
                                 if (specPromptDoc) {
                                     req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: 'Delegando al Back-Office', details: specPromptDoc.name });
                                     
+                                    let dynamicInstructions = '\n\n### ESTRUCTURAS JSON REQUERIDAS POR PLANTILLA\nEl Orquestador necesita que entregues el resultado en formato JSON. Dependiendo de la plantilla que uses, DEBES generar tu respuesta OBLIGATORIAMENTE usando el formato JSON exacto correspondiente:\n';
+                                    for (const f of formats) {
+                                        if (f.ia_instructions) {
+                                            dynamicInstructions += `\n**Si usas ${f.name}**, incluye ESTAS variables en tu JSON:\n${f.ia_instructions}\n`;
+                                        }
+                                    }
+
                                     const specRes = await fetch('https://api.openai.com/v1/chat/completions', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
                                         body: JSON.stringify({
                                             model: 'gpt-4o', 
                                             messages: [
-                                                { role: 'system', content: specPromptDoc.content + refBlock },
+                                                { role: 'system', content: specPromptDoc.content + refBlock + dynamicInstructions },
                                                 { role: 'user', content: specInst }
                                             ],
                                             max_tokens: 3500,
@@ -445,11 +452,12 @@ Eres el encargado de interactuar con el profesor y coordinar el trabajo.
                             const content = fs.readFileSync(templatePath, 'binary');
                             const zip = new PizZip(content);
 
-                            // Extraer etiquetas {{campo}} reales del XML del Word
+                            // Extraer etiquetas {{campo}} reales del texto puro del Word
                             let realKeys = [];
                             try {
                                 const rawXml = zip.files['word/document.xml'] ? zip.files['word/document.xml'].asText() : '';
-                                const tagMatches = rawXml.match(/\{\{([^}]+)\}\}/g) || [];
+                                const pureText = rawXml.replace(/<[^>]+>/g, '');
+                                const tagMatches = pureText.match(/\{\{([^}]+)\}\}/g) || [];
                                 realKeys = [...new Set(tagMatches.map(t => t.replace(/[{}]/g, '').trim()))];
                                 console.log('[WORD GEN] Etiquetas en plantilla:', realKeys);
                             } catch(xe) { console.error('[WORD GEN] Error extrayendo tags:', xe.message); }
