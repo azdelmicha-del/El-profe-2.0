@@ -2,8 +2,8 @@ const { getDb } = require('./db');
 
 // Costos por 1 millón de tokens (en USD)
 const PRICING = {
-    'gpt-4o-mini': { input: 0.15, output: 0.60 },
-    'gpt-4o': { input: 5.00, output: 15.00 }
+    'gpt-4o-mini': { input: 0.15, cached: 0.075, output: 0.60 },
+    'gpt-4o': { input: 2.50, cached: 1.25, output: 10.00 }
 };
 
 async function logApiUsage(identifier, actionDesc, model, usage) {
@@ -13,10 +13,19 @@ async function logApiUsage(identifier, actionDesc, model, usage) {
         const db = getDb();
         const prices = PRICING[model] || PRICING['gpt-4o-mini'];
         
-        // Calcular costo
-        const inputCost = (usage.prompt_tokens / 1000000) * prices.input;
+        // Calcular costo con soporte para tokens en caché
+        let cachedTokens = 0;
+        if (usage.prompt_tokens_details && usage.prompt_tokens_details.cached_tokens) {
+            cachedTokens = usage.prompt_tokens_details.cached_tokens;
+        }
+        
+        const standardInputTokens = usage.prompt_tokens - cachedTokens;
+        
+        const standardInputCost = (standardInputTokens / 1000000) * prices.input;
+        const cachedInputCost = (cachedTokens / 1000000) * prices.cached;
         const outputCost = (usage.completion_tokens / 1000000) * prices.output;
-        const totalCost = inputCost + outputCost;
+        
+        const totalCost = standardInputCost + cachedInputCost + outputCost;
 
         // Registrar en logs de finanzas
         const logEntry = {
