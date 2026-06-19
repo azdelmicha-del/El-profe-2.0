@@ -191,7 +191,7 @@ module.exports = function (app) {
                 }
 
                 const availableSpecialists = prompts.filter(p => p._id.toString() !== defaultPrompt._id.toString());
-                const availableFormats = formats.map(f => f.name);
+                const availableFormats = formats.map(f => f.type);
 
                 MINERD_SYSTEM_PROMPT = defaultPrompt.content + 
                                        `\n\n=== ESTADO DEL DOCENTE ===\nPerfil: ${user.name||'No especificado'}, Grado: ${user.grade||'No especificado'}, Área: ${user.area||'No especificada'}\n\n=== HERRAMIENTAS INTERNAS ===\nEspecialistas disponibles: ${availableSpecialists.map(s=>s.name).join(', ')}\nPlantillas disponibles: ${availableFormats.join(', ')}\n\n=== REGLA DE GENERACIÓN ===\n1. RECOLECTAR DATOS: Si no sabes grado, materia, tema o plantilla preferida, pregunta amablemente antes de avanzar.\n2. DELEGAR AL BACK-OFFICE: SÓLO cuando tengas claro qué tipo de estructura o documento quiere el maestro, DEBES delegar el trabajo usando la herramienta "consultar_especialista" pasando el ID adecuado y todas las instrucciones necesarias. NO intentes redactar la estructura técnica tú mismo.\n3. AUDITAR Y ENTREGAR: Una vez que el especialista te devuelva la estructura cruda, audítala. Si está correcta, preséntala al profesor de manera amigable.\n4. GENERACIÓN DE DOCUMENTO: SÓLO puedes agregar la etiqueta [GENERATE_DOCX] al final de tu mensaje si acabas de recibir una respuesta del especialista con el trabajo técnico. ¡Está PROHIBIDO usar [GENERATE_DOCX] si no has consultado al especialista en esta misma interacción!`;
@@ -261,7 +261,7 @@ module.exports = function (app) {
                                     let dynamicInstructions = '\n\n### REGLA CRÍTICA: ESTRUCTURAS JSON REQUERIDAS POR PLANTILLA\nEl Orquestador es un sistema automatizado que SOLO puede leer formato JSON. Es OBLIGATORIO que entregues todo el contenido de la planificación dentro de un bloque ```json al final de tu respuesta.\nDependiendo de la plantilla que elijas, DEBES estructurar tu JSON exactamente con las siguientes variables:\n';
                                     for (const f of formats) {
                                         if (f.ia_instructions) {
-                                            dynamicInstructions += `\n**Si usas la plantilla ${f.name}**, tu JSON DEBE incluir estas llaves:\n${f.ia_instructions}\n`;
+                                            dynamicInstructions += `\n**Si usas la plantilla ${f.type}**, tu JSON DEBE incluir estas llaves:\n${f.ia_instructions}\n`;
                                         }
                                     }
                                     dynamicInstructions += '\n\nIMPORTANTE: ¡Si no incluyes el bloque ```json con los datos, el sistema fallará y el profesor no recibirá su documento! NO DEVUELVAS TEXTO DE RELLENO, SOLO EL INFORME Y EL JSON.';
@@ -454,7 +454,7 @@ module.exports = function (app) {
                             const outDir = path.join(PROJECT_ROOT, 'public', 'downloads');
                             if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
-                            req.app.emit('system_log', { type: 'SISTEMA', color: '#10b981', title: 'Generando Documento', details: `Inyectando datos en: ${formatDoc.name}` });
+                            req.app.emit('system_log', { type: 'SISTEMA', color: '#10b981', title: 'Generando Documento', details: `Inyectando datos en: ${formatDoc.type}` });
 
                             const outFilename = `Documento-${from}-${Date.now()}.docx`;
                             const outPath = path.join(outDir, outFilename);
