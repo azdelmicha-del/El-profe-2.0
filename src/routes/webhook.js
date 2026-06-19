@@ -272,8 +272,8 @@ module.exports = function (app) {
                                         body: JSON.stringify({
                                             model: 'gpt-4o', 
                                             messages: [
-                                                { role: 'system', content: specPromptDoc.content + refBlock + globalKnowledgeBlock + dynamicInstructions },
-                                                { role: 'user', content: specInst }
+                                                { role: 'system', content: specPromptDoc.content + refBlock + globalKnowledgeBlock },
+                                                { role: 'user', content: specInst + '\n\n' + dynamicInstructions }
                                             ],
                                             max_tokens: 3500,
                                             temperature: 0.2
