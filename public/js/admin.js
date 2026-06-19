@@ -1007,7 +1007,7 @@ window.initFinancePanel = function() {
         data.costsByModel.forEach(m => {
             const opt = document.createElement('option');
             opt.value = m._id || 'Desconocido';
-            opt.textContent = m._id || 'Desconocido';
+            opt.textContent = (m._id === 'N/A') ? 'Ajustes / Otros' : (m._id || 'Desconocido');
             filterSelect.appendChild(opt);
         });
 
