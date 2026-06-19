@@ -6,8 +6,8 @@ async function testWebhook() {
     await connectMongo();
     const db = getDb();
     
-    const from = '18097758962';
-    const text = 'hola';
+    const from = '18099391518';
+    const text = 'si';
     
     console.log('1. Fetched user');
     let user = await db.collection('users').findOne({ phone: from });
@@ -45,6 +45,25 @@ async function testWebhook() {
         { role: 'user', content: text }
     ];
 
+    const tools = [
+        {
+            type: "function",
+            function: {
+                name: "consultar_especialista",
+                description: "Delega la creación de una planificación o estructura a un Especialista técnico en el back-office. Usa esto siempre que el profesor pida crear un material.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        especialista_id: { type: "string", description: "El ID del especialista seleccionado." },
+                        plantilla_nombre: { type: "string", description: "El nombre exacto de la plantilla seleccionada de la lista de Plantillas disponibles." },
+                        instrucciones_detalladas: { type: "string", description: "Instrucciones detalladas y explícitas con TODO lo que el especialista necesita redactar (tema, grado, área, etc)." }
+                    },
+                    required: ["especialista_id", "plantilla_nombre", "instrucciones_detalladas"]
+                }
+            }
+        }
+    ];
+
     console.log('5. Calling OpenAI');
     const orquestadorRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -52,7 +71,7 @@ async function testWebhook() {
         body: JSON.stringify({
             model: 'gpt-4o',
             messages: messages,
-            max_tokens: 1500,
+            tools: tools,
             temperature: 0.3
         })
     });
@@ -61,6 +80,21 @@ async function testWebhook() {
     const data = await orquestadorRes.json();
     console.log('7. OpenAI Response:', JSON.stringify(data, null, 2));
 
+    // LLAMADA SIMULADA DE HERRAMIENTA SI OCURRE
+    if (data.choices[0].message.tool_calls) {
+        console.log('--- TOOL CALLED ---');
+        const toolCall = data.choices[0].message.tool_calls[0];
+        console.log(toolCall.function.name);
+        console.log(toolCall.function.arguments);
+        
+        const args = JSON.parse(toolCall.function.arguments);
+        const specPromptDoc = prompts.find(p => p.name === args.especialista_id || p._id.toString() === args.especialista_id);
+        if (!specPromptDoc) {
+            console.log("ESPECIALISTA NO ENCONTRADO:", args.especialista_id);
+        } else {
+            console.log("ESPECIALISTA ENCONTRADO:", specPromptDoc.name);
+        }
+    }
     
     process.exit(0);
 }

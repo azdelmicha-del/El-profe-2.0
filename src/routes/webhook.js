@@ -202,10 +202,10 @@ module.exports = function (app) {
                         supportedStr = s.supported_formats.map(id => formatsDict[id] || id).join(', ');
                     }
                     return `- ${s.name} (Anclado a plantillas: ${supportedStr})`;
-                }).join('\\n');
+                }).join('\n');
 
                 MINERD_SYSTEM_PROMPT = defaultPrompt.content + 
-                                       `\\n\\n=== ESTADO DEL DOCENTE ===\\nPerfil: ${user.name||'No especificado'}, Grado: ${user.grade||'No especificado'}, Área: ${user.area||'No especificada'}\\n\\n=== HERRAMIENTAS INTERNAS ===\\nEspecialistas disponibles:\\n${availableSpecialistsStr}\\n\\nPlantillas disponibles: ${availableFormats.join(', ')}\\n\\n=== REGLA DE GENERACIÓN ===\\n1. RECOLECTAR DATOS: Si no sabes grado, materia, tema o plantilla preferida, pregunta amablemente antes de avanzar.\\n2. DELEGAR AL BACK-OFFICE: SÓLO cuando tengas claro qué tipo de estructura o documento quiere el maestro, DEBES delegar el trabajo usando la herramienta "consultar_especialista" pasando el ID adecuado (asegúrate de que el especialista soporte la plantilla elegida) y todas las instrucciones necesarias. NO intentes redactar la estructura técnica tú mismo.\\n3. AUDITAR Y ENTREGAR: Una vez que el especialista te devuelva la estructura cruda, audítala. Si está correcta, preséntala al profesor de manera amigable.\\n4. GENERACIÓN DE DOCUMENTO: SÓLO puedes agregar la etiqueta [GENERATE_DOCX] al final de tu mensaje si acabas de recibir una respuesta del especialista con el trabajo técnico. ¡Está PROHIBIDO usar [GENERATE_DOCX] si no has consultado al especialista en esta misma interacción!`;
+                                       `\n\n=== ESTADO DEL DOCENTE ===\nPerfil: ${user.name||'No especificado'}, Grado: ${user.grade||'No especificado'}, Área: ${user.area||'No especificada'}\n\n=== HERRAMIENTAS INTERNAS ===\nEspecialistas disponibles:\n${availableSpecialistsStr}\n\nPlantillas disponibles: ${availableFormats.join(', ')}\n\n=== REGLA DE GENERACIÓN ===\n1. RECOLECTAR DATOS: Si no sabes grado, materia, tema o plantilla preferida, pregunta amablemente antes de avanzar.\n2. DELEGAR AL BACK-OFFICE: SÓLO cuando tengas claro qué tipo de estructura o documento quiere el maestro, DEBES delegar el trabajo usando la herramienta "consultar_especialista" pasando el ID adecuado y el NOMBRE EXACTO de la plantilla.\n3. AUDITAR Y ENTREGAR: Si el especialista reporta "ESTADO: FALTA_DATO_ESENCIAL", PREGÚNTALE AL PROFESOR ese dato que falta de forma natural y NO uses la etiqueta de generar documento. Si el especialista devuelve el JSON completo, preséntalo amigablemente.\n4. GENERACIÓN DE DOCUMENTO: SÓLO puedes agregar la etiqueta [GENERATE_DOCX] al final de tu mensaje si acabas de recibir una respuesta exitosa del especialista con el trabajo técnico y el JSON.`;
 
                 // Removemos globalKnowledgeBlock del Orquestador para no distraerlo. Solo se lo enviamos al Especialista.
                 const systemWithRefs = MINERD_SYSTEM_PROMPT + refBlock;
@@ -225,7 +225,7 @@ module.exports = function (app) {
                                 type: "object",
                                 properties: {
                                     especialista_id: { type: "string", description: "El ID del especialista seleccionado." },
-                                    plantilla_nombre: { type: "string", description: "El nombre exacto de la plantilla seleccionada de la lista de Plantillas disponibles." },
+                                    plantilla_nombre: { type: "string", description: "Copia y pega EXACTAMENTE el nombre de la plantilla elegida desde la lista de Plantillas disponibles (Ej: Plantilla_Planificacion_Diaria_Primaria_Unidad_Aprendizaje). ¡NO inventes nombres, copia el texto tal cual!" },
                                     instrucciones_detalladas: { type: "string", description: "Instrucciones detalladas y explícitas con TODO lo que el especialista necesita redactar (tema, grado, área, etc)." }
                                 },
                                 required: ["especialista_id", "plantilla_nombre", "instrucciones_detalladas"]
