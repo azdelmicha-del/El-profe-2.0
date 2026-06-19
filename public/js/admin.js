@@ -318,6 +318,7 @@ function openPromptModal(prompt) {
     document.getElementById('adminPromptModalTitle').innerText = 'Editar Agente';
     document.getElementById('adminPromptId').value = prompt.id;
     document.getElementById('adminPromptName').value = prompt.name || '';
+    document.getElementById('adminPromptModel').value = prompt.model || 'gpt-4o-mini';
     
     // Hide formats selector for the Orchestrator since it doesn't execute them directly
     const isOrch = (prompt.name || '').replace(/_/g, ' ').trim().toLowerCase() === 'planixa asistente';
@@ -331,6 +332,7 @@ function openPromptModal(prompt) {
     document.getElementById('adminPromptModalTitle').innerText = 'Nuevo Agente';
     document.getElementById('adminPromptId').value = '';
     document.getElementById('adminPromptName').value = '';
+    document.getElementById('adminPromptModel').value = 'gpt-4o-mini';
     const container = document.getElementById('adminPromptFormatsContainer');
     if (container) container.style.display = 'block';
     document.getElementById('adminPromptContent').value = '';
@@ -342,6 +344,7 @@ function openPromptModal(prompt) {
 async function saveAdminPrompt() {
   const id = document.getElementById('adminPromptId').value;
   const name = document.getElementById('adminPromptName').value;
+  const model = document.getElementById('adminPromptModel').value;
   const description = ""; // Deprecated, but keep empty string for backend compatibility if needed
   const content = document.getElementById('adminPromptContent').value;
   const supported_formats = Array.from(document.querySelectorAll('.prompt-format-checkbox:checked')).map(cb => cb.value);
@@ -354,7 +357,7 @@ async function saveAdminPrompt() {
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('planif_token') },
-      body: JSON.stringify({ name, description, content, supported_formats })
+      body: JSON.stringify({ name, model, description, content, supported_formats })
     });
     if (res.ok) {
       document.getElementById('adminPromptModal').style.display = 'none';
@@ -989,6 +992,36 @@ window.initFinancePanel = function() {
 
       const totalTokensEl = document.getElementById('financeTotalTokens');
       if (totalTokensEl) totalTokensEl.textContent = (data.totalTokens || 0).toLocaleString();
+
+      const totalDepositEl = document.getElementById('financeTotalDeposit');
+      if (totalDepositEl) totalDepositEl.textContent = '$' + (data.totalDeposit || 0).toFixed(4);
+      
+      const filterSelect = document.getElementById('financeModelFilter');
+      const costDisplay = document.getElementById('financeModelCostDisplay');
+      if (filterSelect && costDisplay && data.costsByModel) {
+        // Guardar datos temporalmente para filtrar rápido
+        window.financeCostsByModel = data.costsByModel;
+        
+        // Limpiar y llenar opciones (manteniendo Ver Todos)
+        filterSelect.innerHTML = '<option value="all">Ver Todos</option>';
+        data.costsByModel.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m._id || 'Desconocido';
+            opt.textContent = m._id || 'Desconocido';
+            filterSelect.appendChild(opt);
+        });
+
+        // Evento de cambio
+        filterSelect.onchange = (e) => {
+            const val = e.target.value;
+            if (val === 'all') {
+                costDisplay.innerHTML = `Gastos en este modelo: <span style="color:#ef4444; font-weight:bold;">$0.00</span> | Tokens: <span style="color:#3b82f6; font-weight:bold;">0</span>`;
+                return;
+            }
+            const modelData = window.financeCostsByModel.find(m => m._id === val) || { cost: 0, tokens: 0 };
+            costDisplay.innerHTML = `Gastos en este modelo: <span style="color:#ef4444; font-weight:bold;">$${modelData.cost.toFixed(4)}</span> | Tokens: <span style="color:#3b82f6; font-weight:bold;">${modelData.tokens.toLocaleString()}</span>`;
+        };
+      }
       
       const tbody = document.getElementById('financeLogsTableBody');
       if (!tbody) return;

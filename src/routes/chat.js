@@ -202,17 +202,18 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                 if (shouldWork) {
                     // --- FLUJO MULTI-AGENTE (Web) ---
                     
+                    const specModel = selectedPrompt.model || 'gpt-4o-mini';
                     // 1. Especialista
                     const specRes = await fetch('https://api.openai.com/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-                        body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 3000, temperature: 0.3, messages })
+                        body: JSON.stringify({ model: specModel, max_tokens: 3000, temperature: 0.3, messages })
                     });
                     
                     let specReply = '';
                     if (specRes.ok) {
                         const d = await specRes.json();
-                        if (d.usage) await logApiUsage(userId, 'Web: Especialista', 'gpt-4o-mini', d.usage);
+                        if (d.usage) await logApiUsage(userId, 'Web: Especialista', specModel, d.usage);
                         specReply = d?.choices?.[0]?.message?.content?.trim() || '';
                     }
 
@@ -242,17 +243,18 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
                     let supervisedReply = (await callSupervisor(userId, systemWithRefs, message, specReply)).text;
 
                     // 3. Planixa Principal (Entrega Web)
+                    const prinModel = defaultPrompt.model || 'gpt-4o-mini';
                     const principalSystemPrompt = defaultPrompt.content + `\n\nERES LA SECRETARIA. Un Especialista generó este trabajo:\n---\n${supervisedReply}\n---\nEntrégaselo al profesor amable y profesionalmente en la interfaz web. \nREGLA DE ORO: DEBES incluir EXACTAMENTE el mismo bloque [GENERATE_WORD] o [GENERATE_PDF] con su estructura intacta al final de tu mensaje.`;
 
                     const prinRes = await fetch('https://api.openai.com/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-                        body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 4000, temperature: 0.5, messages: [{ role: 'system', content: principalSystemPrompt }] })
+                        body: JSON.stringify({ model: prinModel, max_tokens: 4000, temperature: 0.5, messages: [{ role: 'system', content: principalSystemPrompt }] })
                     });
                     
                     if (prinRes.ok) {
                         const d = await prinRes.json();
-                        if (d.usage) await logApiUsage(userId, 'Web: Principal Delivery', 'gpt-4o-mini', d.usage);
+                        if (d.usage) await logApiUsage(userId, 'Web: Principal Delivery', prinModel, d.usage);
                         reply = d?.choices?.[0]?.message?.content?.trim() || supervisedReply;
                     } else {
                         reply = supervisedReply;
@@ -260,14 +262,15 @@ Nota: Asegúrate de adivinar/usar las claves correctas para el JSON según el co
 
                 } else {
                     // --- FLUJO NORMAL (Planixa Principal) ---
+                    const normModel = defaultPrompt.model || 'gpt-4o-mini';
                     const r = await fetch('https://api.openai.com/v1/chat/completions', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-                        body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 3000, temperature: 0.3, messages })
+                        body: JSON.stringify({ model: normModel, max_tokens: 3000, temperature: 0.3, messages })
                     });
                     if (r.ok) {
                         const d = await r.json();
-                        if (d.usage) await logApiUsage(userId, 'Web: Mensaje Principal', 'gpt-4o-mini', d.usage);
+                        if (d.usage) await logApiUsage(userId, 'Web: Mensaje Principal', normModel, d.usage);
                         reply = d?.choices?.[0]?.message?.content?.trim();
                     }
                     reply = (await callSupervisor(userId, systemWithRefs, message, reply)).text;

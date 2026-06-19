@@ -3,7 +3,9 @@ const { getDb } = require('./db');
 // Costos por 1 millón de tokens (en USD)
 const PRICING = {
     'gpt-4o-mini': { input: 0.15, cached: 0.075, output: 0.60 },
-    'gpt-4o': { input: 2.50, cached: 1.25, output: 10.00 }
+    'gpt-4o': { input: 2.50, cached: 1.25, output: 10.00 },
+    'o1-mini': { input: 3.00, cached: 1.50, output: 12.00 },
+    'o1-preview': { input: 15.00, cached: 7.50, output: 60.00 }
 };
 
 async function logApiUsage(identifier, actionDesc, model, usage) {

@@ -236,11 +236,12 @@ module.exports = function (app) {
 
                 reply = '⚠️ Ocurrió un error en el Orquestador.';
 
+                const orqModel = selectedPrompt.model || 'gpt-4o-mini';
                 const orquestadorRes = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
                     body: JSON.stringify({
-                        model: 'gpt-4o-mini',
+                        model: orqModel,
                         messages: messages,
                         tools: tools,
                         tool_choice: "auto",
@@ -251,7 +252,7 @@ module.exports = function (app) {
 
                 if (orquestadorRes.ok) {
                     const orqData = await orquestadorRes.json();
-                    if (orqData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador', 'gpt-4o-mini', orqData.usage);
+                    if (orqData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador', orqModel, orqData.usage);
                     
                     const responseMessage = orqData.choices[0].message;
 
@@ -297,11 +298,12 @@ module.exports = function (app) {
                                     }
                                     dynamicInstructions += '\n\nIMPORTANTE: ¡Si no incluyes el bloque ```json con los datos, el sistema fallará y el profesor no recibirá su documento! NO DEVUELVAS TEXTO DE RELLENO, SOLO EL INFORME Y EL JSON.';
 
+                                    const specModel = specPromptDoc.model || 'gpt-4o-mini';
                                     const specRes = await fetch('https://api.openai.com/v1/chat/completions', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
                                         body: JSON.stringify({
-                                            model: 'gpt-4o-mini', 
+                                            model: specModel, 
                                             messages: [
                                                 { role: 'system', content: specPromptDoc.content },
                                                 { role: 'user', content: specInst + '\n\n' + dynamicInstructions + '\n\n' + refBlock + '\n\n' + globalKnowledgeBlock }
@@ -314,7 +316,7 @@ module.exports = function (app) {
                                     let specResultText = 'Error en especialista.';
                                     if (specRes.ok) {
                                         const sData = await specRes.json();
-                                        if (sData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Especialista Back', 'gpt-4o-mini', sData.usage);
+                                        if (sData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Especialista Back', specModel, sData.usage);
                                         specResultText = sData.choices[0].message.content;
                                         
                                         // Extraer JSON directamente del especialista para no perderlo
@@ -352,11 +354,12 @@ module.exports = function (app) {
                         }
 
                         req.app.emit('system_log', { type: 'ORQUESTADOR', color: '#3b82f6', title: 'Auditando Trabajo', details: 'El Orquestador está revisando lo entregado.' });
+                        const finalModel = selectedPrompt.model || 'gpt-4o-mini';
                         const finalRes = await fetch('https://api.openai.com/v1/chat/completions', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
                             body: JSON.stringify({
-                                model: 'gpt-4o-mini',
+                                model: finalModel,
                                 messages: messages,
                                 max_tokens: 3500,
                                 temperature: 0.4
@@ -365,7 +368,7 @@ module.exports = function (app) {
 
                         if (finalRes.ok) {
                             const fData = await finalRes.json();
-                            if (fData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador Final', 'gpt-4o-mini', fData.usage);
+                            if (fData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador Final', finalModel, fData.usage);
                             reply = fData.choices[0].message.content.trim();
                         }
                     } else {

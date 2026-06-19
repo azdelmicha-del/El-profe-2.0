@@ -336,6 +336,15 @@
       <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Nombre del Especialista</label>
       <input type="text" id="adminPromptName" placeholder="Ej: Especialista en Matemáticas" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
     </div>
+    <div style="margin-top:15px;">
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Modelo de Inteligencia (Cerebro)</label>
+      <select id="adminPromptModel" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
+        <option value="gpt-4o-mini">GPT-4o-mini (Rápido y Económico - Recomendado)</option>
+        <option value="gpt-4o">GPT-4o (Inteligencia Superior)</option>
+        <option value="o1-mini">o1-mini (Razonamiento Profundo Rápido)</option>
+        <option value="o1-preview">o1-preview (Razonamiento Lógico Avanzado)</option>
+      </select>
+    </div>
     <div style="margin-top:15px;" id="adminPromptFormatsContainer">
       <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Plantillas Vinculadas</label>
       <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Selecciona las plantillas que este agente puede rellenar.</p>

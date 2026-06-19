@@ -360,14 +360,36 @@ ${recentMessagesText || 'No hay mensajes recientes.'}
                     $group: {
                         _id: null,
                         totalCost: { $sum: "$cost" },
-                        totalTokens: { $sum: "$total_tokens" }
+                        totalTokens: { $sum: "$total_tokens" },
+                        totalDeposit: { $sum: "$deposit" }
                     }
                 }
             ]).toArray();
 
-            const totals = aggregation[0] || { totalCost: 0, totalTokens: 0 };
+            // Agregar gastos por modelo
+            const modelAggregation = await db.collection('api_usage').aggregate([
+                {
+                    $match: { cost: { $gt: 0 } }
+                },
+                {
+                    $group: {
+                        _id: "$model",
+                        cost: { $sum: "$cost" },
+                        tokens: { $sum: "$total_tokens" }
+                    }
+                }
+            ]).toArray();
 
-            res.json({ balance, logs, totalCost: totals.totalCost, totalTokens: totals.totalTokens });
+            const totals = aggregation[0] || { totalCost: 0, totalTokens: 0, totalDeposit: 0 };
+
+            res.json({ 
+                balance, 
+                logs, 
+                totalCost: totals.totalCost, 
+                totalTokens: totals.totalTokens, 
+                totalDeposit: totals.totalDeposit || 0,
+                costsByModel: modelAggregation 
+            });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
@@ -522,6 +544,7 @@ Si no pide un PDF explícitamente, responde normalmente.`;
             res.json(prompts.map(p => ({ 
                 id: p._id.toString(), 
                 name: p.name, 
+                model: p.model || 'gpt-4o-mini',
                 description: p.description, 
                 content: p.content,
                 supported_formats: p.supported_formats || [] 
@@ -532,10 +555,10 @@ Si no pide un PDF explícitamente, responde normalmente.`;
     app.post('/api/admin/prompts', authenticateToken, async (req, res) => {
         if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
         try {
-            const { name, description, content, supported_formats } = req.body;
+            const { name, model, description, content, supported_formats } = req.body;
             if (!name || !content) return res.status(400).json({ error: 'Nombre y contenido son requeridos' });
             
-            const newPrompt = { name, description, content, supported_formats: supported_formats || [], created_at: new Date() };
+            const newPrompt = { name, model: model || 'gpt-4o-mini', description, content, supported_formats: supported_formats || [], created_at: new Date() };
             const result = await getDb().collection('prompts').insertOne(newPrompt);
             res.json({ success: true, id: result.insertedId });
         } catch (err) { res.status(500).json({ error: err.message }); }
@@ -545,8 +568,8 @@ Si no pide un PDF explícitamente, responde normalmente.`;
         if (!(await isAdmin(req.userId))) return res.status(403).json({ error: 'Solo admin' });
         try {
             const _id = new mongoose.Types.ObjectId(req.params.id);
-            const { name, description, content, supported_formats } = req.body;
-            await getDb().collection('prompts').updateOne({ _id }, { $set: { name, description, content, supported_formats: supported_formats || [], updated_at: new Date() } });
+            const { name, model, description, content, supported_formats } = req.body;
+            await getDb().collection('prompts').updateOne({ _id }, { $set: { name, model: model || 'gpt-4o-mini', description, content, supported_formats: supported_formats || [], updated_at: new Date() } });
             res.json({ success: true });
         } catch (err) { res.status(500).json({ error: err.message }); }
     });
