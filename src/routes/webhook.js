@@ -763,3 +763,56 @@ function createPdfFromConv(conv, user, outputPath) {
         stream.on('error', reject);
     });
 }
+
+// ==========================================
+// UTILIDADES DE PROCESAMIENTO DE MULTIMEDIA
+// ==========================================
+
+async function downloadWhatsAppMedia(mediaId) {
+    const waToken = process.env.WA_ACCESS_TOKEN;
+    if (!waToken) throw new Error("WA_ACCESS_TOKEN no está configurado en las variables de entorno.");
+
+    const resUrl = await fetch(`https://graph.facebook.com/v17.0/${mediaId}`, {
+        headers: { 'Authorization': `Bearer ${waToken}` }
+    });
+    if (!resUrl.ok) throw new Error(`Error obteniendo URL del medio: ${await resUrl.text()}`);
+    
+    const data = await resUrl.json();
+    const mediaUrl = data.url;
+
+    const resMedia = await fetch(mediaUrl, {
+        headers: { 'Authorization': `Bearer ${waToken}` }
+    });
+    
+    if (!resMedia.ok) throw new Error(`Error descargando medio desde Meta: ${await resMedia.text()}`);
+    
+    const arrayBuffer = await resMedia.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+}
+
+async function processAudioWhisper(buffer) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OPENAI_API_KEY no configurado.");
+
+    // Usamos Blob y FormData nativos de Node.js 18+
+    const blob = new Blob([buffer], { type: 'audio/ogg' });
+    const formData = new FormData();
+    formData.append('file', blob, 'audio.ogg');
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'es'); // Forzamos español por ser MINERD
+
+    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: formData
+    });
+
+    if (!res.ok) {
+        throw new Error(`Error en transcripción Whisper: ${await res.text()}`);
+    }
+
+    const json = await res.json();
+    return json.text;
+}

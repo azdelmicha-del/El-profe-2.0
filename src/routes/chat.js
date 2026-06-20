@@ -358,8 +358,9 @@ TU JSON DEBE RETORNAR OBLIGATORIAMENTE ESTAS LLAVES (keys) y NINGUNA OTRA. Si om
                         jsonData = JSON.parse(jsonMatch[1]);
                     }
 
-                    if (req.pendingFormatId) {
-                        const formatDoc = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(req.pendingFormatId) });
+                    const finalFormatId = req.pendingFormatId || (activeConv && activeConv.pendingFormatId);
+                    if (finalFormatId) {
+                        const formatDoc = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(finalFormatId) });
                         if (formatDoc && formatDoc.filePath) {
                             const templatePath = path.join(__dirname, '../..', 'public', formatDoc.filePath);
                             const outDir = path.join(__dirname, '../..', 'public', 'downloads');

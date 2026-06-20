@@ -695,7 +695,7 @@ async function switchTab(tab) {
     el.classList.remove('active-panel');
     if (id === 'chat-main') continue;
   }
-  if (tab === 'admin' || tab === 'supervisor' || tab === 'finance' || tab === 'manage' || tab === 'payments') {
+  if (tab === 'admin' || tab === 'supervisor' || tab === 'finance' || tab === 'manage' || tab === 'payments' || tab === 'admindash') {
     const side = $('aiChatSidepanel'); if (side) side.style.display = 'none';
     const voiceBtn = $('voiceBtn'); if (voiceBtn) voiceBtn.style.display = 'none';
   } else {
