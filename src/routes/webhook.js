@@ -284,6 +284,21 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
                                     }
                                 }
                                 
+                                // Si no hay formato exacto, abortar y decirle al orquestador que se equivocó
+                                if (!exactFormat) {
+                                    messages.push({
+                                        tool_call_id: toolCall.id,
+                                        role: "tool",
+                                        name: "consultar_especialista",
+                                        content: JSON.stringify({
+                                            "ESTADO": "FALTA_DATO_ESENCIAL",
+                                            "MENSAJE_PARA_PLANIXA_PRINCIPAL": "Error interno: El nombre de la plantilla proporcionado no coincide con ninguna plantilla disponible. Revisa la lista de plantillas y VUELVE A LLAMAR A LA HERRAMIENTA con el nombre EXACTO de la plantilla adecuada."
+                                        })
+                                    });
+                                    // Continuar con el siguiente toolCall si lo hay (aunque normalmente hay 1)
+                                    continue;
+                                }
+                                
                                 // Buscar por nombre (como lo genera el LLM) o por ID (fallback)
                                 const specPromptDoc = prompts.find(p => p.name === specId || p._id.toString() === specId);
                                 if (specPromptDoc) {
