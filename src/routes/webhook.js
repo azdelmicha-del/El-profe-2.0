@@ -206,7 +206,7 @@ module.exports = function (app) {
                 }).join('\n');
 
 MINERD_SYSTEM_PROMPT = defaultPrompt.content + 
-                                       `\n\n=== ESTADO DEL DOCENTE ===\nPerfil: ${user.name||'No especificado'}, Grado: ${user.grade||'No especificado'}, Área: ${user.area||'No especificada'}\n\n=== HERRAMIENTAS INTERNAS ===\nEspecialistas disponibles:\n${availableSpecialistsStr}\n\nPlantillas disponibles: ${availableFormats.join(', ')}\n\n=== REGLA DE GENERACIÓN ===\n1. RECOLECTAR DATOS: Si no sabes grado, materia, tema o plantilla preferida, pregunta amablemente antes de avanzar.\n2. DELEGAR AL BACK-OFFICE: SÓLO cuando tengas claro qué tipo de estructura o documento quiere el maestro, DEBES delegar el trabajo usando la herramienta "consultar_especialista" pasando el ID adecuado y el NOMBRE EXACTO de la plantilla.\n3. AUDITAR Y ENTREGAR: Si el especialista reporta "ESTADO: FALTA_DATO_ESENCIAL", PREGÚNTALE AL PROFESOR ese dato que falta de forma natural y NO uses la etiqueta de generar documento. Si el especialista devuelve el documento Markdown, preséntalo amigablemente.\n4. GENERACIÓN DE DOCUMENTO: SÓLO puedes usar la etiqueta [GENERATE_DOCX] SI Y SÓLO SI acabas de llamar a la herramienta "consultar_especialista" y recibiste la planificación completada. ¡ESTÁ ESTRICTAMENTE PROHIBIDO usar [GENERATE_DOCX] antes de consultar al especialista!\n5. VIGILANTE RECOLECTOR (PERFIL): Si el profesor menciona su nombre, grado, área escolar o centro educativo, DEBES incluir esta etiqueta en tu respuesta: [UPDATE_PROFILE: {"name":"...", "grade":"...", "area":"...", "school":"..."}]. Si menciona un gusto o preferencia, usa [MEMORIA: ...].`;
+                                       `\n\n=== ESTADO DEL DOCENTE ===\nPerfil: ${user.name||'No especificado'}, Grado: ${user.grade||'No especificado'}, Área: ${user.area||'No especificada'}\n\n=== HERRAMIENTAS INTERNAS ===\nEspecialistas disponibles:\n${availableSpecialistsStr}\n\nPlantillas disponibles: ${availableFormats.join(', ')}\n\n=== REGLA DE GENERACIÓN ===\n1. RECOLECTAR DATOS: Si no sabes grado, materia, tema o plantilla preferida, pregunta amablemente antes de avanzar.\n2. DELEGAR AL BACK-OFFICE: SÓLO cuando tengas claro qué tipo de estructura o documento quiere el maestro, DEBES delegar el trabajo usando la herramienta "consultar_especialista" pasando el ID adecuado y el NOMBRE EXACTO de la plantilla. Esta es TU ÚNICA FORMA de crear un documento.\n3. AUDITAR Y ENTREGAR: Si el especialista reporta "ESTADO: FALTA_DATO_ESENCIAL", PREGÚNTALE AL PROFESOR ese dato que falta de forma natural. Si el especialista devuelve el documento Markdown, el sistema lo procesará automáticamente.\n4. PROHIBIDO FINGIR GENERACIÓN: ¡NUNCA ofrezcas enlaces de descarga falsos ni inventes etiquetas por tu cuenta! Si quieres generar el archivo, tu única acción válida es LLAMAR A LA HERRAMIENTA "consultar_especialista". Si no llamas a la herramienta, el profesor no recibirá nada.\n5. VIGILANTE RECOLECTOR (PERFIL): Si el profesor menciona su nombre, grado, área escolar o centro educativo, DEBES incluir esta etiqueta en tu respuesta: [UPDATE_PROFILE: {"name":"...", "grade":"...", "area":"...", "school":"..."}]. Si menciona un gusto o preferencia, usa [MEMORIA: ...].`;
 
                 // Removemos globalKnowledgeBlock del Orquestador para no distraerlo. Solo se lo enviamos al Especialista.
                 const systemWithRefs = MINERD_SYSTEM_PROMPT + refBlock;
@@ -451,18 +451,15 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
 
             await getDb().collection('client_messages').insertOne({ phone: from, message: reply, direction: 'outgoing', employeeId: null, employeeName: 'Bot WhatsApp', createdAt: new Date() });
 
-            // --- 2. ENTREGA DE WORDS POR WHATSAPP ---
-            if (reply.includes('[GENERATE_WORD]') || reply.includes('[GENERATE_DOCX]') || finalJsonFromSpecialist) {
-                try {
-                    let markdownData = finalJsonFromSpecialist || "";
-                    if (!markdownData) {
-                        const mdMatch = reply.match(/```markdown\s*([\s\S]*?)\s*```/);
-                        if (mdMatch) {
-                            markdownData = mdMatch[1];
-                        } else if (reply.length > 300) {
-                            markdownData = reply;
-                        }
+                    // Si por alguna razón la IA alucinó [GENERATE_DOCX] pero no llamó al especialista, lo borramos y no generamos nada
+                    if (!finalJsonFromSpecialist) {
+                        reply = reply.replace(/\[GENERATE_DOCX\]/g, '').replace(/\[GENERATE_WORD\]/g, '');
                     }
+
+            // --- 2. ENTREGA DE WORDS POR WHATSAPP ---
+            if ((reply.includes('[GENERATE_WORD]') || reply.includes('[GENERATE_DOCX]')) && finalJsonFromSpecialist) {
+                try {
+                    let markdownData = finalJsonFromSpecialist;
                     
                     // Limpiar etiquetas de la IA
                     markdownData = markdownData.replace(/\[GENERATE_DOCX\]/g, '').replace(/\[GENERATE_WORD\]/g, '').trim();
