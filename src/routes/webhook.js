@@ -203,7 +203,7 @@ module.exports = function (app) {
                 }).join('\n');
 
 MINERD_SYSTEM_PROMPT = defaultPrompt.content + 
-                                       `\n\n=== ESTADO DEL DOCENTE ===\nPerfil: ${user.name||'No especificado'}, Grado: ${user.grade||'No especificado'}, Área: ${user.area||'No especificada'}\n\n=== HERRAMIENTAS INTERNAS ===\nEspecialistas disponibles:\n${availableSpecialistsStr}\n\nPlantillas disponibles: ${availableFormats.join(', ')}\n\n=== REGLA DE DELEGACIÓN ===\n1. RECOLECTAR DATOS: Si no sabes grado, materia, tema o plantilla preferida, pregunta amablemente antes de avanzar.\n2. DELEGAR AL BACK-OFFICE (OBLIGATORIO): SÓLO cuando tengas claro qué tipo de estructura o documento quiere el maestro, DEBES delegar el trabajo usando la función/herramienta "consultar_especialista" pasando el ID adecuado y el NOMBRE EXACTO de la plantilla. \n3. ¡ESTRICTAMENTE PROHIBIDO! NUNCA intentes escribir los datos del especialista como texto en tu mensaje. TU ÚNICA ACCIÓN es ejecutar la LLAMADA A LA FUNCIÓN (tool call) consultar_especialista.\n4. VIGILANTE RECOLECTOR (PERFIL): Si el profesor menciona su nombre, grado, área escolar o centro educativo, DEBES llamar a la herramienta "actualizar_perfil_docente". Si menciona un gusto o preferencia, usa la etiqueta de texto [MEMORIA: ...].`;
+                                       `\n\n=== ESTADO DEL DOCENTE ===\nPerfil: ${user.name||'No especificado'}, Grado: ${user.grade||'No especificado'}, Área: ${user.area||'No especificada'}\n\n=== HERRAMIENTAS INTERNAS ===\nEspecialistas disponibles:\n${availableSpecialistsStr}\n\nPlantillas disponibles: ${availableFormats.join(', ')}\n\n=== REGLA DE DELEGACIÓN ===\n1. RECOLECTAR DATOS: Si no sabes grado, materia, tema o plantilla preferida, pregunta amablemente antes de avanzar.\n2. DELEGAR AL BACK-OFFICE (OBLIGATORIO): SÓLO cuando tengas claro qué tipo de estructura o documento quiere el maestro, DEBES delegar el trabajo usando la función/herramienta "consultar_especialista" pasando el ID adecuado y el NOMBRE EXACTO de la plantilla. \n3. ¡ESTRICTAMENTE PROHIBIDO! NUNCA intentes escribir los datos del especialista como texto en tu mensaje. TU ÚNICA ACCIÓN es ejecutar la LLAMADA A LA FUNCIÓN (tool call) consultar_especialista.\n4. VIGILANTE RECOLECTOR (PERFIL): Si el profesor menciona su nombre, grado, área escolar o centro educativo, DEBES llamar a la herramienta "actualizar_perfil_docente". Si menciona un gusto o preferencia, usa la etiqueta de texto [MEMORIA: ...].\n5. ⚠️ PROHIBIDO MENTIR AL USUARIO: NUNCA digas "listo", "ya preparé", "está lista", "documento generado", "Word generado" o frases similares a menos que REALMENTE hayas ejecutado consultar_especialista. Si no has delegado al especialista, DÍ "Un momento, estoy procesando..." o "Déjame consultar con el especialista...". Mentir hace que el sistema falle y el usuario no reciba su documento. ES MEJOR DECIR "ESPERA" QUE MENTIR.\n6. 🚫 SI EL USUARIO TE DICE "dame el documento", "dame la planificación" o similar, NO DIGAS QUE YA ESTÁ LISTO. En lugar de eso, LLAMA A consultar_especialista INMEDIATAMENTE.`;
 
                 // Removemos globalKnowledgeBlock del Orquestador para no distraerlo. Solo se lo enviamos al Especialista.
                 const systemWithRefs = MINERD_SYSTEM_PROMPT + refBlock;
@@ -426,6 +426,133 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
                         }
                     } else {
                         reply = responseMessage.content?.trim() || '';
+                        // === ANTI-HALLUCINATION GUARD ===
+                        if (!finalJsonFromSpecialist && reply && /(?:ya\s+(?:prepar[ée]|est[áa]\s+list[oa])|listo[.!]|aqu[íi]\s+tienes?\s+tu)/i.test(reply) && /(?:planificaci[óo]n|documento|word)/i.test(reply)) {
+                            req.app.emit('system_log', { type: 'ANTI-HALLUCINATION', color: '#ef4444', title: 'Orquestador mintió', details: 'Dijo "listo/ya preparé" sin llamar al especialista. Forzando tool call...' });
+                            // Reconstruir mensajes originales + instrucción forzosa
+                            const retryMessages = [
+                                { role: 'system', content: systemWithRefs + '\n\n⚠️ IMPORTANTE: Tu respuesta anterior fue inválida porque no llamaste a consultar_especialista. Esta vez DEBES llamar a consultar_especialista SÍ O SÍ. No respondas texto, solo ejecuta la herramienta.' },
+                                ...historyMessages,
+                                { role: 'user', content: text }
+                            ];
+                            const retryRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                                body: JSON.stringify({
+                                    model: orqModel,
+                                    messages: retryMessages,
+                                    tools: tools,
+                                    tool_choice: { type: "function", function: { name: "consultar_especialista" } },
+                                    max_tokens: 1500,
+                                    temperature: 0.3
+                                })
+                            });
+                            if (retryRes.ok) {
+                                const retryData = await retryRes.json();
+                                if (retryData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador Retry', orqModel, retryData.usage);
+                                const retryMsg = retryData.choices[0].message;
+                                if (retryMsg.tool_calls) {
+                                    messages.push(retryMsg);
+                                    for (const toolCall of retryMsg.tool_calls) {
+                                        if (toolCall.function.name === 'actualizar_perfil_docente') {
+                                            const args = JSON.parse(toolCall.function.arguments);
+                                            const profileUpdate = {};
+                                            if (args.name) profileUpdate.name = args.name;
+                                            if (args.grade) profileUpdate.grade = args.grade;
+                                            if (args.area) profileUpdate.area = args.area;
+                                            if (args.school) profileUpdate.school = args.school;
+                                            if (Object.keys(profileUpdate).length > 0) {
+                                                await getDb().collection('users').updateOne({ _id: user._id }, { $set: profileUpdate });
+                                                req.app.emit('system_log', { type: 'VIGILANTE', color: '#f59e0b', title: 'Perfil Actualizado', details: Object.keys(profileUpdate).join(', ') });
+                                            }
+                                            messages.push({ tool_call_id: toolCall.id, role: "tool", name: "actualizar_perfil_docente", content: JSON.stringify({ ESTADO: "PERFIL_ACTUALIZADO", DATOS: profileUpdate }) });
+                                            continue;
+                                        }
+                                        if (toolCall.function.name === 'consultar_especialista') {
+                                            const args = JSON.parse(toolCall.function.arguments);
+                                            const specId = args.especialista_id;
+                                            const specInst = args.instrucciones_detalladas;
+                                            const plantillaNombre = args.plantilla_nombre;
+                                            finalSpecIdUsed = specId;
+                                            let exactFormat = null;
+                                            if (plantillaNombre && plantillaNombre.toLowerCase() !== 'ninguna' && plantillaNombre.toLowerCase() !== 'ninguno') {
+                                                exactFormat = formats.find(f => f.type === plantillaNombre) || formats.find(f => f.type.toLowerCase().includes(plantillaNombre.toLowerCase().replace(/_/g, ' '))) || formats.find(f => plantillaNombre.toLowerCase().includes(f.type.toLowerCase().replace(/_/g, ' ')));
+                                                if (exactFormat) {
+                                                    if (activeConv) activeConv.pendingFormatId = exactFormat._id.toString();
+                                                    req.pendingFormatId = exactFormat._id.toString();
+                                                    req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#10b981', title: 'Plantilla Fijada', details: exactFormat.type });
+                                                }
+                                            }
+                                            if (!exactFormat && plantillaNombre && plantillaNombre.toLowerCase() !== 'ninguna' && plantillaNombre.toLowerCase() !== 'ninguno') {
+                                                messages.push({ tool_call_id: toolCall.id, role: "tool", name: "consultar_especialista", content: JSON.stringify({ "ESTADO": "FALTA_DATO_ESENCIAL", "MENSAJE_PARA_PLANIXA_PRINCIPAL": "Error interno: El nombre de la plantilla proporcionado no coincide con ninguna plantilla disponible. Revisa la lista de plantillas y VUELVE A LLAMAR A LA HERRAMIENTA con el nombre EXACTO de la plantilla adecuada, o pasa 'Ninguna' si el profesor explícitamente no quiere plantilla." }) });
+                                                continue;
+                                            }
+                                            const specPromptDoc = prompts.find(p => p.name === specId || p._id.toString() === specId);
+                                            if (specPromptDoc) {
+                                                req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: 'Delegando al Back-Office (Retry)', details: specPromptDoc.name });
+                                                let dynamicInstructions = '\n\n### FORMATO OBLIGATORIO: TABLAS\nTodo el contenido DEBE estructurarse en **tablas Markdown**. NO uses listas con viñetas para datos estructurados.\n';
+                                                dynamicInstructions += '- Usa | Col1 | Col2 | con filas de separación |---|---|\n';
+                                                dynamicInstructions += '- Datos clave-valor (Grado, Tema) van en tabla de 2 columnas\n';
+                                                dynamicInstructions += '- Actividades con evidencia/recursos van en tabla de 3-4 columnas\n';
+                                                if (exactFormat) {
+                                                    dynamicInstructions += `\n**ESTRUCTURA SUGERIDA (${exactFormat.type})**: Cubre estos campos: ${exactFormat.tags ? exactFormat.tags.join(', ') : 'los propios del MINERD'}\n`;
+                                                }
+                                                dynamicInstructions += '\nLa ÚLTIMA línea de tu respuesta DEBE ser exactamente: [GENERATE_DOCX]';
+                                                const specModel = specPromptDoc.model || 'gpt-4o-mini';
+                                                req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: `Flujo del Especialista (${specPromptDoc.name})`, details: `(Datos Recibidos + Accediendo a "Plantillas" + Datos de Plantilla "${plantillaNombre || 'X'}" Extraídos + Accediendo a "Conocimientos Planixa" + Conocimientos de Planixa Extraídos + Generando contenido + Enviando Archivo a Planixa Principal)` });
+                                                const specRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                                                    body: JSON.stringify({
+                                                        model: specModel,
+                                                        messages: [
+                                                            { role: 'system', content: specPromptDoc.content },
+                                                            { role: 'user', content: specInst + '\n\n' + dynamicInstructions + '\n\n' + refBlock + '\n\n' + globalKnowledgeBlock }
+                                                        ],
+                                                        max_tokens: 3500,
+                                                        temperature: 0.2
+                                                    })
+                                                });
+                                                let specResultText = 'Error en especialista.';
+                                                if (specRes.ok) {
+                                                    const sData = await specRes.json();
+                                                    if (sData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Especialista Back', specModel, sData.usage);
+                                                    specResultText = sData.choices[0].message.content;
+                                                    finalJsonFromSpecialist = specResultText;
+                                                    try { fs.writeFileSync(path.join(__dirname, '..', '..', 'public', 'downloads', 'debug_spec.txt'), specResultText); } catch(e) {}
+                                                } else {
+                                                    const errText = await specRes.text();
+                                                    console.error("Error API Especialista:", errText);
+                                                    req.app.emit('system_log', { type: 'ERROR', color: '#ef4444', title: 'Error del Especialista', details: errText.slice(0, 150) });
+                                                }
+                                                messages.push({ tool_call_id: toolCall.id, role: "tool", name: "consultar_especialista", content: specResultText });
+                                            } else {
+                                                messages.push({ tool_call_id: toolCall.id, role: "tool", name: "consultar_especialista", content: "Error: Especialista no encontrado." });
+                                            }
+                                        }
+                                    }
+                                    if (finalJsonFromSpecialist) {
+                                        messages.push({ role: 'system', content: 'El especialista ha terminado y te ha devuelto el contenido en Markdown. PRESENTA ESTE CONTENIDO al usuario de forma amigable. IMPORTANTE: Para que el servidor genere el archivo Word, DEBES incluir [GENERATE_DOCX] al final de tu mensaje.' });
+                                        req.app.emit('system_log', { type: 'PLANIXA ASISTENTE', color: '#3b82f6', title: 'Auditando Trabajo', details: 'El Orquestador está revisando lo entregado.' });
+                                        const retryFinalRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` },
+                                            body: JSON.stringify({
+                                                model: orqModel,
+                                                messages: messages,
+                                                max_tokens: 3500,
+                                                temperature: 0.4
+                                            })
+                                        });
+                                        if (retryFinalRes.ok) {
+                                            const retryFinalData = await retryFinalRes.json();
+                                            if (retryFinalData.usage) await logApiUsage(user._id.toString(), 'WhatsApp: Orquestador Final Retry', orqModel, retryFinalData.usage);
+                                            reply = retryFinalData.choices[0].message.content.trim();
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             } catch (err) {
