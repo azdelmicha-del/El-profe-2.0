@@ -6,7 +6,6 @@ const path = require('path');
 const mongoose = require('mongoose');
 const { callSupervisor } = require('../utils/supervisor');
 const { createDocxFromHtml } = require('../utils/google_docs');
-const { buildProfessionalHtml } = require('../utils/docx_styles');
 
 async function generateDocx(markdown, userId, formatId) {
     const { marked } = require('marked');
@@ -17,20 +16,17 @@ async function generateDocx(markdown, userId, formatId) {
     const outPath = path.join(outDir, outFilename);
     const outUrl = `/public/downloads/${outFilename}`;
 
-    const htmlContent = marked.parse(markdown);
-    let styledHtml;
-
-    if (formatId) {
-        const mongoose = require('mongoose');
-        const formatDoc = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(formatId) });
-        if (formatDoc && formatDoc.htmlTemplate && formatDoc.htmlTemplate.length > 50) {
-            styledHtml = formatDoc.htmlTemplate.replace('{{content}}', htmlContent);
-        } else {
-            styledHtml = buildProfessionalHtml(htmlContent);
-        }
-    } else {
-        styledHtml = buildProfessionalHtml(htmlContent);
+    if (!formatId) {
+        throw new Error('No hay formato seleccionado. El orquestador debe elegir un formato con HTML template.');
     }
+
+    const formatDoc = await getDb().collection('doc_formats').findOne({ _id: new mongoose.Types.ObjectId(formatId) });
+    if (!formatDoc || !formatDoc.htmlTemplate || formatDoc.htmlTemplate.length < 50) {
+        throw new Error(`El formato "${formatDoc?.type || 'desconocido'}" no tiene una Plantilla HTML configurada. Agrégala en el panel de Plantillas.`);
+    }
+
+    const htmlContent = marked.parse(markdown);
+    const styledHtml = formatDoc.htmlTemplate.replace('{{content}}', htmlContent);
 
     const buffer = await createDocxFromHtml(styledHtml, outFilename.replace('.docx', ''));
     fs.writeFileSync(outPath, buffer);
