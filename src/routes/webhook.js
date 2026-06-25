@@ -670,7 +670,8 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
                     const outPath = path.join(outDir, outFilename);
                     fs.writeFileSync(outPath, docBuffer);
 
-                    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+                    const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+                    const baseUrl = process.env.BASE_URL || `${proto}://${req.get('host')}`;
                     const outUrl = `${baseUrl}/public/downloads/${outFilename}`;
                     await sendWhatsAppMessage(from, `✅ *Tu planificación está lista, profe.* 📄✨\n\n🔗 *Descárgala aquí:* ${outUrl}\n\nEl enlace expirará cuando se elimine del servidor.`, req.app);
 
