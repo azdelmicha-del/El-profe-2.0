@@ -40,7 +40,7 @@ window.loadAdminWorkflows = function() {
 
     <div style="background:rgba(245, 158, 11, 0.1); border:1px solid #f59e0b; border-radius:8px; padding:15px; position:relative; margin-top:20px;">
       <h4 style="margin:0 0 5px 0; color:#f59e0b; font-size:15px;">3. Google Docs API → DOCX Profesional</h4>
-      <p style="margin:0; font-size:13px; color:var(--text-light);">El servidor toma el Markdown del especialista, lo convierte a HTML con <code>marked</code>, lo envuelve con el membrete MINERD (logo, tabla azul, Times New Roman, footer) usando <code>buildProfessionalHtml()</code>. Crea un documento temporal en Google Docs, lo exporta como <code>.docx</code>, borra el doc temporal y entrega el enlace de descarga al docente.</p>
+      <p style="margin:0; font-size:13px; color:var(--text-light);">El servidor toma el Markdown del especialista, lo convierte a HTML con <code>marked</code>. Si el formato seleccionado tiene una <strong>Plantilla HTML personalizada</strong>, se inyecta el contenido donde esté <code>{<!-- -->{content}}</code>. Si no, se usa el estilo genérico <code>buildProfessionalHtml()</code> con membrete MINERD. Luego crea un documento temporal en Google Docs, lo exporta como <code>.docx</code>, borra el doc temporal y entrega el enlace de descarga al docente.</p>
     </div>
   `;
 
