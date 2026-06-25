@@ -25,29 +25,29 @@ window.loadAdminWorkflows = function() {
 
   coreList.innerHTML = `
     <div style="background:rgba(16, 185, 129, 0.1); border:1px solid #10b981; border-radius:8px; padding:15px; position:relative;">
-      <h4 style="margin:0 0 5px 0; color:#10b981; font-size:15px;">1. Interacción con el Docente (Planixa)</h4>
-      <p style="margin:0; font-size:13px; color:var(--text-light);">El docente escribe su petición. Planixa utiliza sus prompts iniciales para recopilar la información necesaria de acuerdo a las plantillas disponibles. Si todo está correcto, Planixa llama a la función interna <code>consultar_especialista</code>.</p>
+      <h4 style="margin:0 0 5px 0; color:#10b981; font-size:15px;">1. Interacción con el Docente (Planixa - Orquestador)</h4>
+      <p style="margin:0; font-size:13px; color:var(--text-light);">El docente escribe su petición. Planixa (Orquestador) recopila la información necesaria (grado, materia, tema) y elige el especialista adecuado. Llama a la función interna <code>consultar_especialista</code> con las instrucciones detalladas.</p>
       <div style="position:absolute; bottom:-18px; left:50%; width:2px; height:18px; background:var(--border);"></div>
       <div style="position:absolute; bottom:-23px; left:50%; transform:translateX(-50%); color:var(--text-muted);">⬇️</div>
     </div>
     
     <div style="background:rgba(56, 189, 248, 0.1); border:1px solid #38bdf8; border-radius:8px; padding:15px; position:relative; margin-top:20px;">
-      <h4 style="margin:0 0 5px 0; color:#38bdf8; font-size:15px;">2. Servidor Back-Office (Especialista)</h4>
-      <p style="margin:0; font-size:13px; color:var(--text-light);">El servidor recibe el paquete de información. Despierta al <strong>Especialista Pedagógico</strong> (segunda IA) sin que el usuario lo vea. El Especialista analiza la información enviada por Planixa, estructura el contenido pedagógico completo, y devuelve un <code>.json</code> estructurado con todas las variables requeridas por la plantilla seleccionada.</p>
+      <h4 style="margin:0 0 5px 0; color:#38bdf8; font-size:15px;">2. Especialista Back-Office (Markdown)</h4>
+      <p style="margin:0; font-size:13px; color:var(--text-light);">El servidor despierta al <strong>Especialista Pedagógico</strong> (segunda IA) con su prompt técnico + la base de conocimientos MINERD. El especialista genera el contenido pedagógico completo en formato <strong>Markdown</strong> (NO JSON) y agrega <code>[GENERATE_DOCX]</code> al final de su respuesta.</p>
       <div style="position:absolute; bottom:-18px; left:50%; width:2px; height:18px; background:var(--border);"></div>
       <div style="position:absolute; bottom:-23px; left:50%; transform:translateX(-50%); color:var(--text-muted);">⬇️</div>
     </div>
 
     <div style="background:rgba(245, 158, 11, 0.1); border:1px solid #f59e0b; border-radius:8px; padding:15px; position:relative; margin-top:20px;">
-      <h4 style="margin:0 0 5px 0; color:#f59e0b; font-size:15px;">3. Compilación y Respuesta (Docxtemplater)</h4>
-      <p style="margin:0; font-size:13px; color:var(--text-light);">El servidor toma el <code>.json</code> generado por el Especialista, lo inyecta en la plantilla <code>.docx</code> correspondiente usando Docxtemplater, guarda el archivo generado y le envía la ruta final de vuelta a Planixa. Finalmente, Planixa le entrega el documento terminado al Docente.</p>
+      <h4 style="margin:0 0 5px 0; color:#f59e0b; font-size:15px;">3. Google Docs API → DOCX Profesional</h4>
+      <p style="margin:0; font-size:13px; color:var(--text-light);">El servidor toma el Markdown del especialista, lo convierte a HTML con <code>marked</code>, lo envuelve con el membrete MINERD (logo, tabla azul, Times New Roman, footer) usando <code>buildProfessionalHtml()</code>. Crea un documento temporal en Google Docs, lo exporta como <code>.docx</code>, borra el doc temporal y entrega el enlace de descarga al docente.</p>
     </div>
   `;
 
   bgList.innerHTML = `
     <div style="background:var(--card); border:1px solid var(--border); border-radius:8px; padding:15px;">
-      <h4 style="margin:0 0 5px 0; color:var(--primary); font-size:14px;">🛠️ Extraer Variables DOCX</h4>
-      <p style="margin:0; font-size:12px; color:var(--text-muted);">Cuando se sube una nueva plantilla desde el panel de Formatos, el servidor la procesa con <code>docxtemplater</code> en modo inspector, extrayendo las etiquetas {{variable}} y guardándolas en la base de datos automáticamente.</p>
+      <h4 style="margin:0 0 5px 0; color:var(--primary); font-size:14px;">☁️ Google Docs API (OAuth)</h4>
+      <p style="margin:0; font-size:12px; color:var(--text-muted);">Autenticación OAuth con <code>planixaasistente@gmail.com</code> (Drive 15GB). Crea un documento temporal en Google Docs desde HTML, lo exporta a .docx y lo elimina. Soporta variables de entorno (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN) para producción en Render.</p>
     </div>
     <div style="background:var(--card); border:1px solid var(--border); border-radius:8px; padding:15px;">
       <h4 style="margin:0 0 5px 0; color:var(--primary); font-size:14px;">📡 Orquestador de Prompts</h4>

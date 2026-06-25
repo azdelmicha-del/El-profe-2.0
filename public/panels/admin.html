@@ -111,21 +111,21 @@
           
           <!-- Diagrama Visual -->
           <div id="workflowVisualDiagram" style="background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:10px; text-align:center;">
-            <h3 style="font-size:14px; color:var(--text-light); margin-top:0; margin-bottom:20px; text-transform:uppercase; letter-spacing:1px;">Arquitectura de Generación de Documentos</h3>
+            <h3 style="font-size:14px; color:var(--text-light); margin-top:0; margin-bottom:20px; text-transform:uppercase; letter-spacing:1px;">Arquitectura de Generación de Documentos (v2)</h3>
             
             <div style="display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;">
               <div style="background:rgba(16, 185, 129, 0.1); border:2px solid #10b981; padding:15px; border-radius:12px; width:130px;">
                 <div style="font-size:24px; margin-bottom:5px;">👩‍🏫</div>
                 <div style="font-size:13px; font-weight:bold; color:#10b981;">Docente</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-top:5px; line-height:1.2;">Pide plan y da datos en chat</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-top:5px; line-height:1.2;">Escribe su petición en el chat</div>
               </div>
               
               <div style="color:var(--text-muted); font-size:20px; font-weight:bold;">➔</div>
               
               <div style="background:rgba(56, 189, 248, 0.1); border:2px solid #38bdf8; padding:15px; border-radius:12px; width:130px;">
                 <div style="font-size:24px; margin-bottom:5px;">🤖</div>
-                <div style="font-size:13px; font-weight:bold; color:#38bdf8;">Planixa (Recolectora)</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-top:5px; line-height:1.2;">Extrae variables {{}} charlando con profe</div>
+                <div style="font-size:13px; font-weight:bold; color:#38bdf8;">Planixa (Orquestador)</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-top:5px; line-height:1.2;">Recolecta datos y llama al especialista</div>
               </div>
               
               <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
@@ -136,15 +136,15 @@
               <div style="background:rgba(245, 158, 11, 0.1); border:2px solid #f59e0b; padding:15px; border-radius:12px; width:130px;">
                 <div style="font-size:24px; margin-bottom:5px;">🧠</div>
                 <div style="font-size:13px; font-weight:bold; color:#f59e0b;">Especialista</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-top:5px; line-height:1.2;">Aplica MINERD y crea JSON</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-top:5px; line-height:1.2;">Aplica MINERD y genera Markdown + [GENERATE_DOCX]</div>
               </div>
 
               <div style="color:var(--text-muted); font-size:20px; font-weight:bold;">➔</div>
               
               <div style="background:rgba(168, 85, 247, 0.1); border:2px solid #a855f7; padding:15px; border-radius:12px; width:130px;">
-                <div style="font-size:24px; margin-bottom:5px;">📄</div>
-                <div style="font-size:13px; font-weight:bold; color:#a855f7;">Compilador</div>
-                <div style="font-size:11px; color:var(--text-muted); margin-top:5px; line-height:1.2;">Pega JSON en DOCX</div>
+                <div style="font-size:24px; margin-bottom:5px;">☁️</div>
+                <div style="font-size:13px; font-weight:bold; color:#a855f7;">Google Docs API</div>
+                <div style="font-size:11px; color:var(--text-muted); margin-top:5px; line-height:1.2;">Convierte Markdown a DOCX profesional (membrete MINERD)</div>
               </div>
             </div>
           </div>
