@@ -378,10 +378,10 @@
       <input type="text" id="adminFormatType" placeholder="Ej: Examen" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
     </div>
     <div style="margin-top:15px;">
-      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Plantilla Word (.docx)</label>
-      <p style="font-size:11px; color:var(--text-light); margin-bottom:5px;">Sube el documento Word con las etiquetas {{variables}}.</p>
+      <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Archivo .docx de Referencia (Opcional)</label>
+      <p style="font-size:11px; color:var(--text-muted); margin-bottom:5px;">Solo para extraer <code>{<!-- -->{variables}}</code> de referencia. Ya no se usa para generar documentos.</p>
       <input type="file" id="adminFormatFile" accept=".docx" style="width:100%; padding:8px; border-radius:6px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border);">
-      <p id="adminFormatFileStatus" style="font-size:11px; color:var(--primary); margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></p>
+      <p id="adminFormatFileStatus" style="font-size:11px; color:var(--text-muted); margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></p>
     </div>
     <div style="margin-top:15px;" id="adminFormatPromptsContainer">
       <label style="display:block; margin-bottom:5px; font-size:13px; font-weight:bold;">Agentes Especialistas Vinculados</label>

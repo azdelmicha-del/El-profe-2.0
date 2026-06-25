@@ -643,8 +643,6 @@ Si no pide un PDF explícitamente, responde normalmente.`;
                     tags = [...new Set(tagMatches.map(t => t.replace(/[{}]/g, '').trim()))];
                 } catch(e) { console.error('Error extracting tags:', e); }
                 newFormat.tags = tags;
-            } else {
-                return res.status(400).json({ error: 'Debes subir un archivo de plantilla (.docx)' });
             }
 
             const result = await getDb().collection('doc_formats').insertOne(newFormat);

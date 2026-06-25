@@ -533,9 +533,6 @@ async function saveAdminFormat() {
   const fileInput = document.getElementById('adminFormatFile');
   
   if (!type) return await PremiumModal.alert('El tipo es requerido');
-  if (!id && (!fileInput.files || fileInput.files.length === 0)) {
-    return await PremiumModal.alert('Debes subir un archivo .docx para crear un formato.');
-  }
   
   const formData = new FormData();
   formData.append('type', type);
