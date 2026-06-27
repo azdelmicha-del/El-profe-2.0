@@ -158,10 +158,8 @@ module.exports = function (app) {
 
         if (selectedPrompt) {
             let content = selectedPrompt.content;
-
-            // Los prompts ya han sido limpiados en la base de datos, no es necesario hacer .replace() aquí.
-
-            MINERD_SYSTEM_PROMPT = content;
+            const currentDateStr = new Date().toLocaleDateString('es-DO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            MINERD_SYSTEM_PROMPT = `=== CONTEXTO TEMPORAL ===\nHOY ES: ${currentDateStr} (Usa esta fecha para calcular días relativos como "mañana" o "el lunes").\n\n` + content;
         }
 
         // Inject Profile
