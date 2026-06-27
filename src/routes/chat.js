@@ -6,15 +6,21 @@ const path = require('path');
 const mongoose = require('mongoose');
 const { callSupervisor } = require('../utils/supervisor');
 const { createDocxFromHtml } = require('../utils/google_docs');
+const { fillTemplate, extractSpecialistJson } = require('../utils/template_filler');
 
-async function generateDocx(markdown, userId, formatId) {
+/**
+ * Genera un DOCX desde el texto del Especialista.
+ * Soporta dos modos:
+ *   1. JSON estructurado → rellena las {{variables}} de la plantilla HTML
+ *   2. Markdown libre → convierte a HTML e inyecta en {{content}} (flujo legacy)
+ */
+async function generateDocx(specialistText, userId, formatId) {
     const { marked } = require('marked');
     const outDir = path.join(__dirname, '../..', 'public', 'downloads');
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
     const outFilename = `Documento-${userId}-${Date.now()}.docx`;
     const outPath = path.join(outDir, outFilename);
-    const outUrl = `/public/downloads/${outFilename}`;
 
     if (!formatId) {
         throw new Error('No hay formato seleccionado. El orquestador debe elegir un formato con HTML template.');
@@ -25,8 +31,21 @@ async function generateDocx(markdown, userId, formatId) {
         throw new Error(`El formato "${formatDoc?.type || 'desconocido'}" no tiene una Plantilla HTML configurada. Agrégala en el panel de Plantillas.`);
     }
 
-    const htmlContent = marked.parse(markdown);
-    const styledHtml = formatDoc.htmlTemplate.replace('{{content}}', htmlContent);
+    // Intentar extraer JSON estructurado del Especialista
+    const { json: specialistData } = extractSpecialistJson(specialistText);
+
+    let styledHtml;
+    if (specialistData && Object.keys(specialistData).length > 0) {
+        // NUEVO FLUJO: Rellenar {{variables}} con el JSON del Especialista
+        styledHtml = fillTemplate(formatDoc.htmlTemplate, specialistData);
+    } else {
+        // FLUJO LEGACY: Markdown → HTML → inyectar en {{content}}
+        const cleanMarkdown = specialistText.replace(/\[GENERATE_DOCX\]/g, '').replace(/\[GENERATE_WORD\]/g, '').trim();
+        const htmlContent = marked.parse(cleanMarkdown);
+        styledHtml = formatDoc.htmlTemplate.includes('{{content}}')
+            ? formatDoc.htmlTemplate.replace('{{content}}', htmlContent)
+            : htmlContent;
+    }
 
     const buffer = await createDocxFromHtml(styledHtml, outFilename.replace('.docx', ''));
     fs.writeFileSync(outPath, buffer);

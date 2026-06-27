@@ -7,9 +7,55 @@ const { logApiUsage } = require('../finance');
 const { callSupervisor } = require('../utils/supervisor');
 const { createDocxFromHtml } = require('../utils/google_docs');
 const { marked } = require('marked');
+const { fillTemplate, extractSpecialistJson } = require('../utils/template_filler');
 
 const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || 'elprofe2_verify_2026';
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
+
+/**
+ * Construye las instrucciones dinámicas que se envían al Especialista.
+ * Si el formato tiene una lista de variables ({{...}}), instruye al Especialista
+ * a devolver un JSON estructurado. Si no, usa el flujo legacy de Markdown.
+ */
+function buildSpecialistInstructions(exactFormat) {
+    if (exactFormat && exactFormat.variables && exactFormat.variables.length > 0) {
+        const varList = exactFormat.variables.join('", "');
+        return `\n\n=== INSTRUCCIÓN CRÍTICA: DEBES DEVOLVER UN JSON ESTRUCTURADO ===
+La plantilla seleccionada ("${exactFormat.type}") tiene campos específicos que DEBES rellenar.
+Tu respuesta DEBE ser ÚNICAMENTE un bloque JSON válido con esta estructura exacta:
+
+\`\`\`json
+{
+  "${varList}"
+}
+\`\`\`
+
+REGLAS IMPORTANTES:
+- Las claves que empiezan con "check_" deben tener valor "true" o "false" (sin comillas de booleano en JSON sí van como string: "true"/"false").
+- Las claves que terminan en "_html_list" pueden ser un string con viñetas separadas por salto de línea, o un array de strings.
+- Para datos que no apliquen o sean desconocidos, usa "-" como valor.
+- NO incluyas texto fuera del bloque JSON.
+- Al FINAL del bloque JSON (fuera de las comillas), agrega en una línea nueva: [GENERATE_DOCX]
+
+Ejemplo de salida esperada:
+\`\`\`json
+{ "nombre_completo_docente": "Ana García", "grado_y_seccion": "2do A", ... }
+\`\`\`
+[GENERATE_DOCX]`;
+    }
+
+    // Flujo legacy: plantilla sin variables definidas → Markdown con tablas
+    let instructions = '\n\n### FORMATO OBLIGATORIO: TABLAS\nTodo el contenido DEBE estructurarse en **tablas Markdown**. NO uses listas con viñetas para datos estructurados.\n';
+    instructions += '- Usa | Col1 | Col2 | con filas de separación |---|---|\n';
+    instructions += '- Datos clave-valor (Grado, Tema) van en tabla de 2 columnas\n';
+    instructions += '- Actividades con evidencia/recursos van en tabla de 3-4 columnas\n';
+    if (exactFormat) {
+        instructions += `\n**ESTRUCTURA SUGERIDA (${exactFormat.type})**: Cubre estos campos: ${exactFormat.tags ? exactFormat.tags.join(', ') : 'los propios del MINERD'}\n`;
+    }
+    instructions += '\nLa ÚLTIMA línea de tu respuesta DEBE ser exactamente: [GENERATE_DOCX]';
+    return instructions;
+}
+
 
 module.exports = function (app) {
     app.get('/webhook/whatsapp', (req, res) => {
@@ -335,14 +381,7 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
                                 const specPromptDoc = prompts.find(p => p.name === specId || p._id.toString() === specId);
                                 if (specPromptDoc) {
                                     req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: 'Delegando al Back-Office', details: specPromptDoc.name });
-                                    let dynamicInstructions = '\n\n### FORMATO OBLIGATORIO: TABLAS\nTodo el contenido DEBE estructurarse en **tablas Markdown**. NO uses listas con viñetas para datos estructurados.\n';
-                                    dynamicInstructions += '- Usa | Col1 | Col2 | con filas de separación |---|---|\n';
-                                    dynamicInstructions += '- Datos clave-valor (Grado, Tema) van en tabla de 2 columnas\n';
-                                    dynamicInstructions += '- Actividades con evidencia/recursos van en tabla de 3-4 columnas\n';
-                                    if (exactFormat) {
-                                        dynamicInstructions += `\n**ESTRUCTURA SUGERIDA (${exactFormat.type})**: Cubre estos campos: ${exactFormat.tags ? exactFormat.tags.join(', ') : 'los propios del MINERD'}\n`;
-                                    }
-                                    dynamicInstructions += '\nLa ÚLTIMA línea de tu respuesta DEBE ser exactamente: [GENERATE_DOCX]';
+                                    let dynamicInstructions = buildSpecialistInstructions(exactFormat);
 
                                     const specModel = specPromptDoc.model || 'gpt-4o-mini';
                                     req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: `Flujo del Especialista (${specPromptDoc.name})`, details: `(Datos Recibidos + Accediendo a "Plantillas" + Datos de Plantilla "${plantillaNombre || 'X'}" Extraídos + Accediendo a "Conocimientos Planixa" + Conocimientos de Planixa Extraídos + Generando contenido + Enviando Archivo a Planixa Principal)` });
@@ -490,14 +529,7 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
                                             const specPromptDoc = prompts.find(p => p.name === specId || p._id.toString() === specId);
                                             if (specPromptDoc) {
                                                 req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: 'Delegando al Back-Office (Retry)', details: specPromptDoc.name });
-                                                let dynamicInstructions = '\n\n### FORMATO OBLIGATORIO: TABLAS\nTodo el contenido DEBE estructurarse en **tablas Markdown**. NO uses listas con viñetas para datos estructurados.\n';
-                                                dynamicInstructions += '- Usa | Col1 | Col2 | con filas de separación |---|---|\n';
-                                                dynamicInstructions += '- Datos clave-valor (Grado, Tema) van en tabla de 2 columnas\n';
-                                                dynamicInstructions += '- Actividades con evidencia/recursos van en tabla de 3-4 columnas\n';
-                                                if (exactFormat) {
-                                                    dynamicInstructions += `\n**ESTRUCTURA SUGERIDA (${exactFormat.type})**: Cubre estos campos: ${exactFormat.tags ? exactFormat.tags.join(', ') : 'los propios del MINERD'}\n`;
-                                                }
-                                                dynamicInstructions += '\nLa ÚLTIMA línea de tu respuesta DEBE ser exactamente: [GENERATE_DOCX]';
+                                                let dynamicInstructions = buildSpecialistInstructions(exactFormat);
                                                 const specModel = specPromptDoc.model || 'gpt-4o-mini';
                                                 req.app.emit('system_log', { type: 'ESPECIALISTA', color: '#f59e0b', title: `Flujo del Especialista (${specPromptDoc.name})`, details: `(Datos Recibidos + Accediendo a "Plantillas" + Datos de Plantilla "${plantillaNombre || 'X'}" Extraídos + Accediendo a "Conocimientos Planixa" + Conocimientos de Planixa Extraídos + Generando contenido + Enviando Archivo a Planixa Principal)` });
                                                 const specRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -632,22 +664,12 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
                         reply = reply.replace(/\[GENERATE_DOCX\]/g, '').replace(/\[GENERATE_WORD\]/g, '');
                     }
 
-            // --- 2. ENTREGA DE WORDS POR WHATSAPP (Google Docs API) ---
+            // --- 2. ENTREGA DE WORDS POR WHATSAPP (Google Docs API + Template Filler) ---
             const hasGenTag = reply.includes('[GENERATE_WORD]') || reply.includes('[GENERATE_DOCX]');
             if (hasGenTag && finalJsonFromSpecialist) {
                 try {
-                    let markdownData = finalJsonFromSpecialist
-                        .replace(/\[GENERATE_DOCX\]/g, '')
-                        .replace(/\[GENERATE_WORD\]/g, '')
-                        .trim();
+                    req.app.emit('system_log', { type: 'SISTEMA NODE.JS', color: '#10b981', title: 'Generando Documento', details: 'Procesando JSON del Especialista y rellenando plantilla...' });
 
-                    if (!markdownData) {
-                        markdownData = reply.replace(/\[GENERATE_DOCX\]/g, '').replace(/\[GENERATE_WORD\]/g, '').trim();
-                    }
-
-                    req.app.emit('system_log', { type: 'SISTEMA NODE.JS', color: '#10b981', title: 'Generando Documento', details: 'Google Docs API: creando documento Word profesional' });
-
-                    const htmlContent = marked.parse(markdownData);
                     const finalFormatId = req.pendingFormatId || (activeConv && activeConv.pendingFormatId);
 
                     if (!finalFormatId) {
@@ -659,7 +681,24 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
                         throw new Error(`El formato "${formatDoc?.type || 'desconocido'}" no tiene una Plantilla HTML configurada. Agrégala en el panel de Plantillas.`);
                     }
 
-                    const styledHtml = formatDoc.htmlTemplate.replace('{{content}}', htmlContent);
+                    // Intentar extraer JSON estructurado del Especialista
+                    const { json: specialistData } = extractSpecialistJson(finalJsonFromSpecialist);
+                    
+                    let styledHtml;
+                    if (specialistData && Object.keys(specialistData).length > 0) {
+                        // NUEVO FLUJO: Rellena las {{variables}} de la plantilla con el JSON
+                        req.app.emit('system_log', { type: 'SISTEMA NODE.JS', color: '#10b981', title: 'Rellenando Variables', details: `${Object.keys(specialistData).length} campos detectados en el JSON del Especialista` });
+                        styledHtml = fillTemplate(formatDoc.htmlTemplate, specialistData);
+                    } else {
+                        // FLUJO LEGACY: Si el especialista devolvió Markdown libre, convertir a HTML y usar {{content}}
+                        req.app.emit('system_log', { type: 'SISTEMA NODE.JS', color: '#f59e0b', title: 'Flujo Legacy (Markdown)', details: 'El Especialista no devolvió JSON. Usando conversión Markdown→HTML.' });
+                        const cleanMarkdown = finalJsonFromSpecialist.replace(/\[GENERATE_DOCX\]/g, '').replace(/\[GENERATE_WORD\]/g, '').trim();
+                        const htmlContent = marked.parse(cleanMarkdown);
+                        styledHtml = formatDoc.htmlTemplate.includes('{{content}}') 
+                            ? formatDoc.htmlTemplate.replace('{{content}}', htmlContent)
+                            : htmlContent;
+                    }
+
                     req.app.emit('system_log', { type: 'SISTEMA NODE.JS', color: '#10b981', title: 'Usando HTML Template', details: formatDoc.type });
 
                     const docBuffer = await createDocxFromHtml(styledHtml, `Planifica-${from}-${Date.now()}`);
