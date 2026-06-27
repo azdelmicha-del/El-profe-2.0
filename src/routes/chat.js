@@ -138,33 +138,7 @@ module.exports = function (app) {
         if (selectedPrompt) {
             let content = selectedPrompt.content;
 
-            // Limpiar instrucciones obsoletas de plantillas .docx y validación de plantillas
-            content = content
-                // Eliminar secciones enteras de "PLANTILLAS QUE PUEDES USAR" hasta el final o hasta otro encabezado
-                .replace(/PLANTILLAS QUE PUEDES USAR[\s\S]*?(?=\n---|\n[A-Z][A-Z]|\n$|$)/gi, '')
-                // Eliminar referencias a ESTADO/PLANTILLA_INCORRECTA y lógica de validación
-                .replace(/"ESTADO"\s*:.*?PLANTILLA_INCORRECTA.*?(?=\n|\})/gi, '')
-                // Eliminar frases de selección/validación de plantillas
-                .replace(/seleccionar la plantilla correcta[^.]*\./gi, '')
-                .replace(/seleccionar la plantilla correspondiente[^.]*\./gi, '')
-                .replace(/validar.*?plantilla[^.]*\./gi, '')
-                .replace(/verificar.*?plantilla[^.]*\./gi, '')
-                // Eliminar listas de nombres de plantillas .docx
-                .replace(/Plantilla_\w+\.docx/g, '')
-                .replace(/Plantilla_\w+/g, '')
-                // Eliminar referencias a rellenar plantillas
-                .replace(/rellenar la plantilla correspondiente[^.]*\./gi, 'generar el contenido estructurado.')
-                .replace(/rellenar la plantilla[^.]*\./gi, 'generar el contenido.')
-                // Reemplazar "documento Word .docx" con "contenido Markdown"
-                .replace(/documento Word \.docx/g, 'contenido en formato Markdown')
-                .replace(/documento Word/g, 'contenido Markdown')
-                // Reemplazar instrucciones de devolver .docx
-                .replace(/devolver a PLANIXA_principal un documento[^.]*\./gi, 'generar el contenido y devolverlo a PLANIXA_principal.')
-                // Eliminar la instrucción de plantilla incorrecta
-                .replace(/\{[\s]*"ESTADO"[\s]*:[\s]*"PLANTILLA_INCORRECTA"[\s]*\}/gi, '')
-                .replace(/ESTADO.*?PLANTILLA_INCORRECTA.*?\n/gi, '')
-                // Eliminar cualquier JSON de error de plantilla
-                .replace(/\{[^}]*"ESTADO"[^}]*"PLANTILLA_INCORRECTA"[^}]*\}/gi, '');
+            // Los prompts ya han sido limpiados en la base de datos, no es necesario hacer .replace() aquí.
 
             MINERD_SYSTEM_PROMPT = content;
         }
