@@ -447,7 +447,7 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
                                         tool_call_id: toolCall.id,
                                         role: "tool",
                                         name: "consultar_especialista",
-                                        content: specResultText
+                                        content: "ÉXITO. La planificación ha sido generada por el servidor interno. NO tienes acceso al contenido para mostrarlo. TU ÚNICA TAREA AHORA ES DECIRLE AL DOCENTE: '✅ Tu documento está listo' Y AGREGAR [GENERATE_DOCX] AL FINAL DE TU MENSAJE. No digas nada más."
                                     });
                                 } else {
                                     messages.push({
