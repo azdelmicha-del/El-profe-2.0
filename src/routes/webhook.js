@@ -466,7 +466,7 @@ MINERD_SYSTEM_PROMPT = defaultPrompt.content +
                     } else {
                         reply = responseMessage.content?.trim() || '';
                         // === ANTI-HALLUCINATION GUARD ===
-                        if (!finalJsonFromSpecialist && reply && /(?:ya\s+(?:prepar[ée]|est[áa]\s+list[oa])|listo[.!]|aqu[íi]\s+tienes?\s+tu)/i.test(reply) && /(?:planificaci[óo]n|documento|word)/i.test(reply)) {
+                        if (!finalJsonFromSpecialist && reply && /(?:ya\s+(?:prepar[ée]|est[áa]\s+list[oa])|listo[.!]|aqu[íi]\s+tienes?\s+tu|voy\s+a\s+proceder|un\s+momento|procesando|enseguida|generarla|estoy\s+generando|trabajando\s+en\s+ello)/i.test(reply) && /(?:planificaci[óo]n|documento|word|generarla|hacerla|trabajar|momento)/i.test(reply)) {
                             req.app.emit('system_log', { type: 'ANTI-HALLUCINATION', color: '#ef4444', title: 'Orquestador mintió', details: 'Dijo "listo/ya preparé" sin llamar al especialista. Forzando tool call...' });
                             // Reconstruir mensajes originales + instrucción forzosa
                             const retryMessages = [
