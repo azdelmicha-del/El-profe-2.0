@@ -225,8 +225,9 @@ module.exports = function (app) {
             const usersSummary = topUsers.map(u => `- ${u.name || u.phone} (Plan: ${u.plan || 'free'}): ${u.plans_count || 0} planificaciones`).join('\n');
 
             const systemPrompt = `Eres el asistente experto del CEO de 'Planixa', un SaaS B2B/B2C de planificación docente en República Dominicana.
-Tu objetivo es analizar datos de clientes, detectar quejas o fricciones, sugerir mejoras en ventas, y ayudar a tomar decisiones de negocio.
-Responde de forma clara, directa, profesional y muy analítica. Nunca des respuestas genéricas. Ve al grano.
+Tu objetivo es analizar datos de clientes, ayudar a tomar decisiones de negocio y, ESPECIALMENTE, actuar como Ingeniero de Prompts.
+Tienes acceso a herramientas para listar, leer y actualizar los prompts de la base de datos de producción.
+REGLA MUY ESTRICTA: NUNCA utilices la herramienta 'actualizar_prompt' sin antes mostrarle al usuario exactamente cómo quedará el prompt y preguntarle de forma explícita si está de acuerdo con guardar los cambios. Si el usuario no ha dicho "Sí, guárdalo", no puedes llamar a 'actualizar_prompt'.
 
 === DATOS EN VIVO DE LA PLATAFORMA ===
 - Usuarios Registrados: ${totalUsers}
@@ -250,29 +251,120 @@ ${recentMessagesText || 'No hay mensajes recientes.'}
             }
             messages.push({ role: 'user', content: message });
             
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+            const tools = [
+                {
+                    type: "function",
+                    function: {
+                        name: "listar_prompts",
+                        description: "Obtiene una lista con los nombres de todos los prompts disponibles en la base de datos."
+                    }
                 },
-                body: JSON.stringify({
-                    model: 'gpt-4o',
-                    messages: messages,
-                    max_tokens: 1500,
-                    temperature: 0.5
-                })
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error?.message || 'Error en OpenAI');
+                {
+                    type: "function",
+                    function: {
+                        name: "leer_prompt",
+                        description: "Obtiene el contenido completo de un prompt específico de la base de datos.",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string", description: "El nombre exacto del prompt a leer." }
+                            },
+                            required: ["name"]
+                        }
+                    }
+                },
+                {
+                    type: "function",
+                    function: {
+                        name: "actualizar_prompt",
+                        description: "Sobreescribe el contenido de un prompt en la base de datos. NUNCA USES ESTA HERRAMIENTA SIN CONFIRMACIÓN EXPLÍCITA DEL USUARIO.",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string", description: "El nombre exacto del prompt a actualizar." },
+                                content: { type: "string", description: "El nuevo contenido completo del prompt." }
+                            },
+                            required: ["name", "content"]
+                        }
+                    }
+                }
+            ];
             
-            if (data.usage) await logApiUsage(req.userId, 'Admin: Asistente SaaS', 'gpt-4o', data.usage);
+            let finalResponse = null;
+            let currentMessages = messages;
+            let recursionCount = 0;
             
-            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-                console.error("OpenAI no devolvió texto válido:", JSON.stringify(data));
-                return res.json({ response: "Lo siento, la IA no devolvió una respuesta válida." });
+            while (!finalResponse && recursionCount < 5) {
+                recursionCount++;
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: 'gpt-4o',
+                        messages: currentMessages,
+                        tools: tools,
+                        tool_choice: 'auto',
+                        max_tokens: 2500,
+                        temperature: 0.5
+                    })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error?.message || 'Error en OpenAI');
+                
+                if (data.usage) await logApiUsage(req.userId, 'Admin: Asistente SaaS', 'gpt-4o', data.usage);
+                
+                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                    console.error("OpenAI no devolvió texto válido:", JSON.stringify(data));
+                    return res.json({ response: "Lo siento, la IA no devolvió una respuesta válida." });
+                }
+                
+                const responseMessage = data.choices[0].message;
+                
+                if (responseMessage.tool_calls) {
+                    currentMessages.push(responseMessage);
+                    for (const toolCall of responseMessage.tool_calls) {
+                        if (toolCall.function.name === 'listar_prompts') {
+                            const prompts = await db.collection('prompts').find({}, { projection: { name: 1, description: 1 } }).toArray();
+                            const promptList = prompts.map(p => `- ${p.name}: ${p.description || 'Sin descripción'}`).join('\n');
+                            currentMessages.push({
+                                tool_call_id: toolCall.id,
+                                role: "tool",
+                                name: "listar_prompts",
+                                content: promptList || "No se encontraron prompts."
+                            });
+                        } else if (toolCall.function.name === 'leer_prompt') {
+                            const args = JSON.parse(toolCall.function.arguments);
+                            const promptDoc = await db.collection('prompts').findOne({ name: args.name });
+                            currentMessages.push({
+                                tool_call_id: toolCall.id,
+                                role: "tool",
+                                name: "leer_prompt",
+                                content: promptDoc ? promptDoc.content : `Error: Prompt '${args.name}' no encontrado.`
+                            });
+                        } else if (toolCall.function.name === 'actualizar_prompt') {
+                            const args = JSON.parse(toolCall.function.arguments);
+                            const updateResult = await db.collection('prompts').updateOne(
+                                { name: args.name },
+                                { $set: { content: args.content, updated_at: new Date() } }
+                            );
+                            let resultMsg = updateResult.modifiedCount > 0 ? `Éxito: El prompt '${args.name}' fue actualizado correctamente en la base de datos.` : `Aviso: No se encontró el prompt '${args.name}' o el contenido nuevo es exactamente igual al anterior.`;
+                            currentMessages.push({
+                                tool_call_id: toolCall.id,
+                                role: "tool",
+                                name: "actualizar_prompt",
+                                content: resultMsg
+                            });
+                        }
+                    }
+                } else {
+                    finalResponse = responseMessage.content;
+                }
             }
-            res.json({ response: data.choices[0].message.content });
+            
+            res.json({ response: finalResponse || "Se alcanzó el límite de llamadas internas." });
         } catch (err) { 
             console.error('Error en /api/admin/ai:', err);
             res.status(500).json({ error: err.message }); 
